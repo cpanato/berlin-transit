@@ -8,7 +8,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"sort"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 	_ "time/tzdata" // Europe/Berlin also works on hosts without a timezone database.
 
 	"github.com/cpanato/berlin-transit/internal/domain"
+	"github.com/cpanato/berlin-transit/internal/netguard"
 	"github.com/cpanato/berlin-transit/internal/provider"
 )
 
@@ -53,44 +53,8 @@ func New(base string, timeout time.Duration) (*Client, error) {
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, time.Now)
 }
 
-func publicIP(ip netip.Addr) bool {
-	ip = ip.Unmap()
-	if !ip.IsGlobalUnicast() || ip.IsPrivate() {
-		return false
-	}
-	if ip.Is6() && !netip.MustParsePrefix("2000::/3").Contains(ip) {
-		return false
-	}
-	for _, p := range []string{"100.64.0.0/10", "192.0.0.0/24", "192.0.2.0/24", "192.88.99.0/24", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24", "240.0.0.0/4", "2001::/23", "2001:db8::/32", "2002::/16", "3fff::/20"} {
-		if netip.MustParsePrefix(p).Contains(ip) {
-			return false
-		}
-	}
-	return true
-}
-
 func publicDial(ctx context.Context, network, addr string) (net.Conn, error) {
-	host, port, err := net.SplitHostPort(addr)
-	if err != nil || host != "v6.vbb.transport.rest" || port != "443" {
-		return nil, errors.New("blocked destination")
-	}
-	ips, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
-	if err != nil || len(ips) == 0 {
-		return nil, errors.New("DNS unavailable")
-	}
-	for _, ip := range ips {
-		if !publicIP(ip) {
-			return nil, errors.New("blocked destination")
-		}
-	}
-	var dialer net.Dialer
-	for _, ip := range ips {
-		conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
-		if err == nil {
-			return conn, nil
-		}
-	}
-	return nil, errors.New("connection unavailable")
+	return netguard.DialContext(ctx, network, addr, "v6.vbb.transport.rest")
 }
 
 // Test construction is deliberately private; production has no unsafe URL override.

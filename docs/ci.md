@@ -4,7 +4,7 @@
 dispatch. Security checks also run weekly on Monday at 06:23 UTC. Both use
 read-only repository access, disabled checkout credentials, job timeouts,
 redundant-run cancellation, no secrets and no telemetry export. They execute
-no live VBB queries. Dependency/tool downloads and vulnerability database reads
+no live VBB or TRMNL queries. Dependency/tool downloads and vulnerability database reads
 require outbound HTTPS; source analysis happens on the runner.
 
 CI checks formatting, vet, tests, race tests, fuzzing, module integrity/tidiness,
@@ -14,6 +14,8 @@ shared domain validation. The CLI is
 measured but excluded from that gate because `main` exits the process. Cross
 builds cover Linux, macOS and Windows on amd64 and arm64 with CGO disabled.
 Fuzz targets exercise domain input validation, upstream JSON and HTTP query parsing.
+CI also builds the flat private-plugin import ZIP with `make trmnl-package`; this
+bundle is only local to the runner and is not uploaded or sent to TRMNL.
 
 Security checks run govulncheck, gosec, Gitleaks over full Git history, and
 Trivy filesystem vulnerability, misconfiguration, secret and license checks.

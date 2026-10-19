@@ -1,0 +1,150 @@
+<style>
+  .bt-board, .bt-footer { font-family: Arial, Helvetica, sans-serif; color: #000; background: #fff; box-sizing: border-box; }
+  .layout.bt-board { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; width: 100%; height: calc(100% - 32px); padding: 18px 22px 10px; gap: 8px; }
+  .bt-board * { box-sizing: border-box; }
+  .bt-stations { display: flex; flex: 1; flex-direction: column; min-height: 0; gap: 16px; }
+  .bt-station { display: flex; flex: 1; flex-direction: column; min-height: 0; min-width: 0; }
+  .bt-heading { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 3px solid #000; }
+  .bt-symbol { display: flex; flex: 0 0 44px; align-items: center; justify-content: center; width: 44px; height: 44px; border: 2px solid #000; border-radius: 50%; font-size: 34px; font-weight: 900; line-height: 1; }
+  .bt-heading-text { flex: 1; min-width: 0; }
+  .bt-kicker { font-size: 10px; line-height: 1.3; letter-spacing: 2px; font-weight: 700; text-transform: uppercase; }
+  .bt-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 32px; line-height: 1.1; font-weight: 800; }
+  .bt-collected { font-size: 11px; line-height: 1.4; white-space: nowrap; }
+  .bt-cache { font-weight: 800; }
+  .bt-rows { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+  .bt-row { display: flex; flex: 1; align-items: center; min-height: 0; gap: 14px; border-bottom: 1px solid #000; padding: 8px 0; }
+  .bt-row:last-child { border-bottom: 0; }
+  .bt-line { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; min-width: 54px; max-width: 82px; padding: 5px 8px; overflow: hidden; border: 2px solid #000; border-radius: 6px; font-size: 23px; line-height: 1; font-weight: 800; white-space: nowrap; }
+  .bt-destination-block { flex: 1; min-width: 0; }
+  .bt-destination { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 22px; line-height: 1.2; font-weight: 700; }
+  .bt-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 10px; margin-top: 5px; font-size: 12px; line-height: 1.1; }
+  .bt-tag { display: inline-block; border: 1px solid #000; border-radius: 3px; padding: 3px 5px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .bt-tag--strong { border-width: 2px; font-weight: 900; }
+  .bt-time-block { flex: 0 0 auto; text-align: right; }
+  .bt-time-label { font-size: 9px; font-weight: 700; line-height: 1.2; letter-spacing: 1px; }
+  .bt-time { font-size: 31px; font-weight: 800; line-height: 1; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+  .bt-plan { margin-top: 3px; font-size: 11px; line-height: 1; }
+  .bt-cancelled .bt-time { text-decoration: line-through; }
+  .bt-row--next { flex: 1.5; }
+  .bt-row--next .bt-line { border-width: 3px; font-size: 28px; }
+  .bt-row--next .bt-destination { font-size: 29px; }
+  .bt-row--next .bt-time { font-size: 61px; letter-spacing: -2px; }
+  .bt-row--next .bt-time-label { font-size: 10px; }
+  .bt-row--next .bt-meta { margin-top: 8px; font-size: 14px; }
+  .bt-row--next .bt-tag { font-size: 12px; }
+  .bt-empty { display: flex; flex: 1; align-items: center; justify-content: center; flex-direction: column; gap: 10px; padding: 12px; text-align: center; font-size: 20px; }
+  .bt-empty strong { font-size: 28px; }
+  .bt-empty span { font-size: 14px; }
+  .bt-note { font-size: 10px; line-height: 1.2; }
+  .title_bar.bt-footer { display: flex; align-items: center; justify-content: space-between; width: 100%; height: 32px; padding: 0 22px; border-top: 2px solid #000; }
+  .bt-brand { font-size: 10px; font-weight: 800; letter-spacing: 1.5px; }
+  .bt-generated { font-size: 10px; }
+  .bt-board--multi .bt-heading { padding-bottom: 7px; border-bottom-width: 2px; gap: 8px; }
+  .bt-board--multi .bt-symbol { flex-basis: 32px; width: 32px; height: 32px; font-size: 24px; }
+  .bt-board--multi .bt-name { font-size: 24px; }
+  .bt-board--multi .bt-kicker { font-size: 8px; }
+  .bt-board--multi .bt-row { gap: 10px; padding: 6px 0; }
+  .bt-board--multi .bt-row--next { flex: 1; }
+  .bt-board--multi .bt-row--next .bt-time { font-size: 36px; letter-spacing: -1px; }
+  .bt-board--multi .bt-row--next .bt-destination { font-size: 21px; }
+  .bt-board--multi .bt-row--next .bt-line { font-size: 22px; min-width: 48px; }
+  .bt-board--multi .bt-row--next .bt-meta { font-size: 12px; margin-top: 4px; }
+  .bt-board--multi .bt-row--next .bt-tag { font-size: 10px; }
+  .bt-board--vertical { padding: 14px 16px 8px !important; }
+  .bt-board--vertical .bt-name { font-size: 27px; }
+  .bt-board--vertical .bt-heading { gap: 9px; }
+  .bt-board--vertical .bt-row { gap: 8px; flex-wrap: wrap; position: relative; }
+  .bt-board--vertical .bt-line { font-size: 20px; min-width: 44px; padding: 4px; }
+  .bt-board--vertical .bt-destination { font-size: 18px; }
+  .bt-board--vertical .bt-row--next { flex: 1.3; }
+  .bt-board--vertical .bt-row--next .bt-destination { font-size: 21px; }
+  .bt-board--vertical .bt-row--next .bt-time { font-size: 42px; }
+  .bt-board--vertical .bt-row--next .bt-line { font-size: 23px; }
+  .bt-board--vertical .bt-row--next .bt-meta { font-size: 12px; }
+  .bt-board--vertical .bt-time { font-size: 27px; }
+  .bt-board--vertical .bt-time-label { font-size: 8px; letter-spacing: 0; }
+  .bt-board--horizontal { padding: 12px 18px 6px !important; }
+  .bt-board--horizontal .bt-stations { flex-direction: row; gap: 20px; }
+  .bt-board--horizontal .bt-name { font-size: 24px; }
+  .bt-board--horizontal .bt-symbol { flex-basis: 32px; width: 32px; height: 32px; font-size: 24px; }
+  .bt-board--horizontal .bt-heading { gap: 8px; padding-bottom: 7px; border-bottom-width: 2px; }
+  .bt-board--horizontal .bt-kicker { font-size: 8px; }
+  .bt-board--horizontal .bt-row--next .bt-time { font-size: 44px; }
+  .bt-board--horizontal .bt-row--next .bt-destination { font-size: 23px; }
+  .bt-board--horizontal.bt-board--multi .bt-row--next .bt-time { font-size: 34px; }
+  .bt-board--horizontal.bt-board--multi .bt-row { gap: 7px; }
+  .bt-board--horizontal.bt-board--multi .bt-row--next .bt-destination { font-size: 17px; }
+  .bt-board--horizontal.bt-board--multi .bt-row--next .bt-line { font-size: 19px; min-width: 40px; padding: 4px; }
+  .bt-board--horizontal.bt-board--multi .bt-row--next .bt-meta { font-size: 11px; }
+  .bt-board--quadrant { padding: 10px 14px 6px !important; }
+  .bt-board--quadrant .bt-name { font-size: 24px; }
+  .bt-board--quadrant .bt-symbol { flex-basis: 30px; width: 30px; height: 30px; font-size: 23px; }
+  .bt-board--quadrant .bt-heading { gap: 8px; padding-bottom: 7px; border-bottom-width: 2px; }
+  .bt-board--quadrant .bt-kicker { font-size: 8px; }
+  .bt-board--quadrant .bt-row { gap: 8px; }
+  .bt-board--quadrant .bt-row--next .bt-line { font-size: 21px; min-width: 40px; padding: 4px; }
+  .bt-board--quadrant .bt-row--next .bt-destination { font-size: 18px; }
+  .bt-board--quadrant .bt-row--next .bt-time { font-size: 39px; }
+  .bt-board--quadrant .bt-row--next .bt-meta { font-size: 11px; margin-top: 5px; }
+  .bt-board--quadrant .bt-row--next .bt-tag { font-size: 10px; }
+</style>
+{% assign station_limit = 1 %}
+{% assign departure_limit = 3 %}
+
+<div class="layout bt-board bt-board--vertical{% if stations.size > 1 %} bt-board--multi{% endif %}">
+  <div class="bt-stations">
+    {% for group in stations limit: station_limit %}
+    <section class="bt-station" aria-label="{{ group.station.name | default: group.station.id | escape }}">
+      <div class="bt-heading">
+        <span class="bt-symbol" aria-hidden="true">S</span>
+        <div class="bt-heading-text">
+          <div class="bt-kicker">Berlin · S-Bahn</div>
+          <div class="bt-name">{{ group.station.name | default: group.station.id | replace: " (Berlin)", "" | escape }}</div>
+          <div class="bt-collected">{% if group.stale %}<span class="bt-cache">CACHED · </span>{% endif %}Collected {{ group.collected_at | date: "%d %b %H:%M %z" | escape }}</div>
+        </div>
+      </div>
+      <div class="bt-rows">
+        {% for dep in group.departures limit: departure_limit %}
+        <div class="bt-row{% if forloop.first %} bt-row--next{% endif %}{% if dep.cancelled %} bt-cancelled{% endif %}">
+          <span class="bt-line">{{ dep.line | default: "—" | escape }}</span>
+          <div class="bt-destination-block">
+            {% if forloop.first %}<div class="bt-kicker">{% if dep.cancelled %}Cancelled service{% elsif group.stale %}Cached departure{% else %}Up next{% endif %}</div>{% endif %}
+            <div class="bt-destination">{{ dep.direction | default: "Destination unavailable" | replace: " (Berlin)", "" | escape }}</div>
+            <div class="bt-meta">
+              <span>Platform {{ dep.platform | default: "—" | escape }}</span>
+              <span class="bt-tag{% if dep.cancelled %} bt-tag--strong{% endif %}">
+                {% if dep.cancelled %}CANCELLED
+                {% elsif dep.delay_seconds == nil %}Delay unknown
+                {% elsif group.stale %}Last delay {{ dep.delay_seconds | escape }} s
+                {% elsif dep.delay_seconds == 0 %}On time
+                {% else %}
+                  {% assign delay_abs = dep.delay_seconds | abs %}
+                  {% assign delay_remainder = delay_abs | modulo: 60 %}
+                  {% if dep.delay_seconds > 0 %}+{% else %}−{% endif %}{% if delay_remainder == 0 and delay_abs >= 60 %}{{ delay_abs | divided_by: 60 | escape }} min{% else %}{{ delay_abs | escape }} s{% endif %}
+                {% endif %}
+              </span>
+            </div>
+          </div>
+          <div class="bt-time-block">
+            <div class="bt-time-label">{% if dep.predicted_at and dep.cancelled == false %}{% if group.stale %}LAST PRED.{% else %}PREDICTED{% endif %}{% else %}SCHEDULED{% endif %}</div>
+            <div class="bt-time">{% if dep.predicted_at and dep.cancelled == false %}{{ dep.predicted_at | date: "%H:%M" | escape }}{% elsif dep.planned_at %}{{ dep.planned_at | date: "%H:%M" | escape }}{% else %}—{% endif %}</div>
+            {% if dep.planned_at and dep.predicted_at and dep.planned_at != dep.predicted_at and dep.cancelled == false %}<div class="bt-plan">Plan {{ dep.planned_at | date: "%H:%M" | escape }}</div>{% endif %}
+          </div>
+        </div>
+        {% else %}
+        <div class="bt-empty"><strong>No departures</strong><span>No services returned in this snapshot</span></div>
+        {% endfor %}
+      </div>
+    </section>
+    {% else %}
+    <div class="bt-empty"><strong>No snapshot available</strong><span>Departure data has not arrived yet</span></div>
+    {% endfor %}
+  </div>
+  {% if stations.size > station_limit or unavailable_stations.size > 0 %}
+  <div class="bt-note">{% if stations.size > station_limit %}Showing {{ station_limit | escape }} of {{ stations.size | escape }} stations. {% endif %}{% if unavailable_stations.size > 0 %}{{ unavailable_stations.size | escape }} station(s) unavailable.{% endif %}</div>
+  {% endif %}
+</div>
+<div class="title_bar bt-footer">
+  <span class="bt-brand">BERLIN TRANSIT · VBB</span>
+  <span class="bt-generated">Snapshot {{ generated_at | date: "%H:%M %z" | escape }}</span>
+</div>

@@ -1,0 +1,67 @@
+{
+  "generated_at": "2026-10-19T18:44:00+02:00",
+  "stations": [
+    {
+      "station": {
+        "id": "900135001",
+        "name": "S Buch (Berlin)"
+      },
+      "collected_at": "2026-10-19T18:43:45+02:00",
+      "source": "vbb",
+      "stale": false,
+      "realtime": true,
+      "departures": [
+        {
+          "line": "S2",
+          "direction": "S Lichtenrade (Berlin)",
+          "planned_at": "2026-10-19T18:43:00+02:00",
+          "predicted_at": "2026-10-19T18:43:00+02:00",
+          "delay_seconds": 0,
+          "platform": "2",
+          "cancelled": false
+        },
+        {
+          "line": "S2",
+          "direction": "S Bernau Bhf",
+          "planned_at": "2026-10-19T18:43:00+02:00",
+          "predicted_at": "2026-10-19T18:44:00+02:00",
+          "delay_seconds": 60,
+          "platform": "1",
+          "cancelled": false
+        },
+        {
+          "line": "S2",
+          "direction": "S Blankenfelde (TF) Bhf",
+          "planned_at": "2026-10-19T18:53:00+02:00",
+          "predicted_at": "2026-10-19T18:53:00+02:00",
+          "delay_seconds": 0,
+          "platform": "1",
+          "cancelled": false
+        },
+        {
+          "line": "S2",
+          "direction": "S Bernau Bhf",
+          "planned_at": "2026-10-19T19:03:00+02:00",
+          "predicted_at": null,
+          "delay_seconds": null,
+          "platform": null,
+          "cancelled": true
+        }
+      ]
+    },
+    {
+      "station": {
+        "id": "900003201",
+        "name": "S Bornholmer Straße"
+      },
+      "collected_at": "2026-10-19T18:42:30+02:00",
+      "source": "vbb",
+      "stale": true,
+      "realtime": false,
+      "last_success_at": "2026-10-19T18:42:30+02:00",
+      "stale_age_seconds": 90,
+      "departures": []
+    }
+  ],
+  "unavailable_stations": []
+}

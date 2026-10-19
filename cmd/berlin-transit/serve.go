@@ -6,10 +6,13 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
+	"github.com/cpanato/berlin-transit/internal/collector"
 	"github.com/cpanato/berlin-transit/internal/config"
 	"github.com/cpanato/berlin-transit/internal/httpapi"
+	"github.com/cpanato/berlin-transit/internal/integrations/trmnl"
 	"github.com/cpanato/berlin-transit/internal/service"
 )
 
@@ -17,14 +20,32 @@ func serve(ctx context.Context, cfg config.Config, p service.Provider, log *slog
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	s, err := service.New(ctx, p, cfg.Service)
 	if err != nil {
 		return err
 	}
 	defer s.Close()
+	var publisher *trmnl.Client
+	if cfg.TRMNL.Enabled {
+		publisher, err = trmnl.NewClient(cfg.TRMNL)
+		if err != nil {
+			return err
+		}
+		defer publisher.Close()
+	}
 	listener, err := net.Listen("tcp", cfg.ListenAddr)
 	if err != nil {
 		return errors.New("listener unavailable")
+	}
+	var workers sync.WaitGroup
+	defer func() { cancel(); workers.Wait() }()
+	if cfg.Collector.Enabled {
+		workers.Go(func() { collector.Run(ctx, cfg.Collector, s, log) })
+	}
+	if cfg.TRMNL.Enabled {
+		workers.Go(func() { trmnl.Run(ctx, cfg.TRMNL, publisher, s, cfg.Collector.Stations, cfg.Collector.Options, log) })
 	}
 	a := httpapi.New(s, log, cfg.MetricsEnabled, listener.Addr().String())
 	server := httpapi.Server(listener.Addr().String(), a, cfg.HTTPTimeout, log)

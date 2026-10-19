@@ -331,6 +331,31 @@ func (s *Service) Departures(ctx context.Context, id string, o domain.Options) (
 	if err != nil {
 		return domain.Departures{}, err
 	}
+	return s.departuresSnapshot(e, stale)
+}
+
+// CachedDepartures reads an existing snapshot only; it never calls a provider.
+// Expired data is eligible only within the same absolute stale-age and upstream
+// cache restrictions used for error fallback. Missing/evicted/no-store snapshots
+// and data requiring revalidation are unavailable to offline consumers.
+func (s *Service) CachedDepartures(id string, o domain.Options) (domain.Departures, bool) {
+	o, err := domain.NormalizeOptions(id, o)
+	if err != nil || s.ctx.Err() != nil {
+		return domain.Departures{}, false
+	}
+	e, ok := s.cache.Get(key("vbb", "departures", id, o))
+	if !ok || e.Policy.Revalidate {
+		return domain.Departures{}, false
+	}
+	stale := !s.now().Before(e.FreshUntil)
+	if stale && (e.Policy.NoStale || !s.now().Before(e.StoredAt.Add(s.cfg.MaxStale))) {
+		return domain.Departures{}, false
+	}
+	out, err := s.departuresSnapshot(e, stale)
+	return out, err == nil
+}
+
+func (s *Service) departuresSnapshot(e cache.Entry, stale bool) (domain.Departures, error) {
 	var out domain.Departures
 	if err := json.Unmarshal(e.Value, &out); err != nil {
 		return out, &Error{Code: "unavailable"}

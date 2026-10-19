@@ -13,8 +13,10 @@ import (
 	"time"
 
 	"github.com/cpanato/berlin-transit/internal/config"
+	"github.com/cpanato/berlin-transit/internal/domain"
 	"github.com/cpanato/berlin-transit/internal/httpapi"
 	"github.com/cpanato/berlin-transit/internal/observability"
+	"github.com/cpanato/berlin-transit/internal/provider"
 	"github.com/cpanato/berlin-transit/internal/service"
 )
 
@@ -108,4 +110,54 @@ func TestServeErrorsAndArguments(t *testing.T) {
 	if err := runServer(context.Background(), server, l2, a, log); err == nil || err.Error() != "server unavailable" {
 		t.Fatal(err)
 	}
+}
+
+func TestServeBackgroundShutdown(t *testing.T) {
+	cfg, err := config.Load(func(k string) string {
+		switch k {
+		case "BERLIN_TRANSIT_COLLECTOR_ENABLED":
+			return "true"
+		case "BERLIN_TRANSIT_COLLECTOR_STATIONS":
+			return "id"
+		}
+		return ""
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.ListenAddr = "127.0.0.1:0" // ephemeral loopback listener for this test only
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	p := &signalProvider{called: make(chan struct{}, 1)}
+	done := make(chan error, 1)
+	go func() { done <- serve(ctx, cfg, p, observability.Logger(io.Discard, slog.LevelInfo)) }()
+	select {
+	case <-p.called:
+	case <-time.After(3 * time.Second):
+		t.Fatal("collector did not start")
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("background shutdown hung")
+	}
+	cfg.TRMNL.Enabled = true
+	cfg.TRMNL.WebhookURL = "secret"
+	if err := serve(context.Background(), cfg, p, observability.Logger(io.Discard, slog.LevelInfo)); err == nil || strings.Contains(err.Error(), "secret") {
+		t.Fatal(err)
+	}
+}
+
+type signalProvider struct {
+	fakeProvider
+	called chan struct{}
+}
+
+func (p *signalProvider) Departures(ctx context.Context, id string, o domain.Options, tag string) (provider.Result[domain.Departures], error) {
+	p.called <- struct{}{}
+	return p.fakeProvider.Departures(ctx, id, o, tag)
 }

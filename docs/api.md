@@ -193,5 +193,7 @@ The VBB client disables redirects and proxies, validates DNS answers and dials
 only validated public IPs with TLS certificate verification. Responses are capped
 at 2 MiB, headers at 64 KiB and upstream connections at four. The API server uses
 5s read-header, 10s read, `HTTP_TIMEOUT+5s` write and 60s idle timeouts, and a
-16 KiB header limit. There is no scheduled polling, TRMNL output, container network
-mapping, deployment or publishing.
+16 KiB header limit. Optional scheduled collection and TRMNL output are disabled
+by default; see the [adapter guide](../integrations/trmnl/README.md) for opt-in
+configuration and virtual-device testing. There is no container network mapping,
+deployment or image/release publication.
