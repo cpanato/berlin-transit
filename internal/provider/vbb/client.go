@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -13,27 +12,20 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 	_ "time/tzdata" // Europe/Berlin also works on hosts without a timezone database.
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/cpanato/berlin-transit/internal/domain"
+	"github.com/cpanato/berlin-transit/internal/provider"
 )
 
 const Origin = "https://v6.vbb.transport.rest"
 const maxBody = 2 << 20
 
-var ErrInput = errors.New("invalid collector input")
+var ErrInput = domain.ErrInput
 
 // Error deliberately excludes request URLs and upstream response bodies.
-type Error struct {
-	Code   string
-	Status int
-}
-
-func (e *Error) Error() string { return "vbb: " + e.Code }
+type Error = provider.Error
 
 type Client struct {
 	base string
@@ -112,75 +104,86 @@ func newClient(base string, hc *http.Client, now func() time.Time) (*Client, err
 
 func (c *Client) Close() { c.http.CloseIdleConnections() }
 
-func validText(s string, max int) bool {
-	return s != "" && len(s) <= max && utf8.ValidString(s) && !strings.ContainsFunc(s, unicode.IsControl)
-}
-func validID(s string) bool {
-	return validText(s, 256) && strings.TrimSpace(s) == s && s != "." && s != ".." && !strings.ContainsAny(s, "/\\?#%") && !strings.ContainsFunc(s, unicode.IsSpace)
-}
-
-func (c *Client) get(ctx context.Context, path string, q url.Values, out any) error {
+func (c *Client) get(ctx context.Context, path string, q url.Values, etag string, out any) (provider.Policy, bool, error) {
+	var empty provider.Policy
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base+path+"?"+q.Encode(), nil)
 	if err != nil {
-		return &Error{Code: "request"}
+		return empty, false, &Error{Code: "request"}
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "berlin-transit/0.1")
+	req.Header.Set("User-Agent", "berlin-transit/0.2")
+	if etag != "" {
+		req.Header.Set("If-None-Match", etag)
+	}
 	resp, err := c.http.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return empty, false, ctx.Err()
 		}
-		return &Error{Code: "unavailable"}
+		return empty, false, &Error{Code: "unavailable"}
 	}
-	defer func() { _ = resp.Body.Close() }() // Read errors are handled below; closing cannot change the result.
+	defer func() { _ = resp.Body.Close() }()
+	policy := cachePolicy(resp.Header)
+	if resp.StatusCode == http.StatusNotModified {
+		if etag == "" {
+			return empty, false, &Error{Code: "invalid_response"}
+		}
+		return policy, true, nil
+	}
 	if resp.StatusCode != http.StatusOK {
-		return &Error{Code: "upstream_status", Status: resp.StatusCode}
+		return empty, false, &Error{Code: "upstream_status", Status: resp.StatusCode, RetryAt: retryAfter(resp.Header.Get("Retry-After"), c.now())}
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxBody+1))
 	if err != nil {
-		return &Error{Code: "read"}
+		if ctx.Err() != nil {
+			return empty, false, ctx.Err()
+		}
+		return empty, false, &Error{Code: "read"}
 	}
 	if len(body) > maxBody {
-		return &Error{Code: "response_too_large"}
+		return empty, false, &Error{Code: "response_too_large"}
 	}
 	if json.Unmarshal(body, out) != nil {
-		return &Error{Code: "invalid_response"}
+		return empty, false, &Error{Code: "invalid_response"}
 	}
-	return nil
+	return policy, false, nil
 }
 
-func (c *Client) SearchStations(ctx context.Context, query string, limit int) ([]domain.Station, error) {
-	query = strings.TrimSpace(query)
-	if !validText(query, 200) || limit < 1 || limit > 50 {
-		return nil, ErrInput
+func (c *Client) SearchStations(ctx context.Context, query string, limit int, etag string) (provider.Result[[]domain.Station], error) {
+	var zero provider.Result[[]domain.Station]
+	query, err := domain.SearchQuery(query, limit)
+	if err != nil {
+		return zero, err
 	}
 	var raw []struct {
 		ID   string  `json:"id"`
 		Name *string `json:"name"`
 		Type string  `json:"type"`
 	}
-	err := c.get(ctx, "/locations", url.Values{"query": {query}, "results": {strconv.Itoa(limit)}, "stops": {"true"}, "addresses": {"false"}, "poi": {"false"}}, &raw)
+	policy, notModified, err := c.get(ctx, "/locations", url.Values{"query": {query}, "results": {strconv.Itoa(limit)}, "stops": {"true"}, "addresses": {"false"}, "poi": {"false"}}, etag, &raw)
 	if err != nil {
-		return nil, err
+		return zero, err
+	}
+	if notModified {
+		return provider.Result[[]domain.Station]{Policy: policy, NotModified: true}, nil
 	}
 	if raw == nil {
-		return nil, &Error{Code: "invalid_response"}
+		return zero, &Error{Code: "invalid_response"}
 	}
 	out := make([]domain.Station, 0, len(raw))
 	for _, s := range raw {
 		if s.Type != "stop" && s.Type != "station" {
 			continue
 		}
-		if !validID(s.ID) {
-			return nil, &Error{Code: "invalid_response"}
+		if !domain.ValidID(s.ID) {
+			return zero, &Error{Code: "invalid_response"}
 		}
 		out = append(out, domain.Station{ID: s.ID, Name: s.Name})
 		if len(out) == limit {
 			break
 		}
 	}
-	return out, nil
+	return provider.Result[[]domain.Station]{Data: out, Policy: policy}, nil
 }
 
 type departure struct {
@@ -202,31 +205,16 @@ type departure struct {
 	Provenance      *string    `json:"provenance"`
 }
 
-var modes = []string{"suburban", "subway", "tram", "bus", "ferry", "express", "regional"}
-
-func (c *Client) Departures(ctx context.Context, id string, opts domain.Options) (domain.Departures, error) {
-	var zero domain.Departures
-	if opts.Mode == "" {
-		opts.Mode = "suburban"
-	}
-	if opts.Limit == 0 {
-		opts.Limit = 10
-	}
-	if opts.Duration == 0 {
-		opts.Duration = 30
-	}
-	if !validID(id) || opts.Limit < 1 || opts.Limit > 50 || opts.Duration < 1 || opts.Duration > 120 || (opts.Direction != "" && !validID(opts.Direction)) {
-		return zero, ErrInput
+func (c *Client) Departures(ctx context.Context, id string, opts domain.Options, etag string) (provider.Result[domain.Departures], error) {
+	var zero provider.Result[domain.Departures]
+	opts, err := domain.NormalizeOptions(id, opts)
+	if err != nil {
+		return zero, err
 	}
 	q := url.Values{"results": {strconv.Itoa(opts.Limit)}, "duration": {strconv.Itoa(opts.Duration)}, "remarks": {"false"}}
-	found := false
-	for _, m := range modes {
+	for _, m := range domain.Modes {
 		enabled := m == opts.Mode
-		found = found || enabled
 		q.Set(m, strconv.FormatBool(enabled))
-	}
-	if !found {
-		return zero, fmt.Errorf("%w: unsupported mode", ErrInput)
 	}
 	if opts.Direction != "" {
 		q.Set("direction", opts.Direction)
@@ -235,8 +223,12 @@ func (c *Client) Departures(ctx context.Context, id string, opts domain.Options)
 		Departures *[]departure `json:"departures"`
 		Updated    *int64       `json:"realtimeDataUpdatedAt"`
 	}
-	if err := c.get(ctx, "/stops/"+url.PathEscape(id)+"/departures", q, &raw); err != nil {
+	policy, notModified, err := c.get(ctx, "/stops/"+url.PathEscape(id)+"/departures", q, etag, &raw)
+	if err != nil {
 		return zero, err
+	}
+	if notModified {
+		return provider.Result[domain.Departures]{Policy: policy, NotModified: true}, nil
 	}
 	if raw.Departures == nil {
 		return zero, &Error{Code: "invalid_response"}
@@ -281,7 +273,7 @@ func (c *Client) Departures(ctx context.Context, id string, opts domain.Options)
 			break
 		}
 	}
-	return out, nil
+	return provider.Result[domain.Departures]{Data: out, Policy: policy}, nil
 }
 
 func (c *Client) local(t *time.Time) *time.Time {

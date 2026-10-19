@@ -1,4 +1,4 @@
-// berlin-transit collects normalized JSON on demand. It opens no listener.
+// berlin-transit collects JSON on demand or explicitly serves a loopback API.
 package main
 
 import (
@@ -11,21 +11,23 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
+	"github.com/cpanato/berlin-transit/internal/config"
 	"github.com/cpanato/berlin-transit/internal/domain"
+	"github.com/cpanato/berlin-transit/internal/observability"
+	"github.com/cpanato/berlin-transit/internal/provider"
 	"github.com/cpanato/berlin-transit/internal/provider/vbb"
 )
 
 // Define the provider interface where it is consumed.
-type provider interface {
-	SearchStations(context.Context, string, int) ([]domain.Station, error)
-	Departures(context.Context, string, domain.Options) (domain.Departures, error)
+type collectorProvider interface {
+	SearchStations(context.Context, string, int, string) (provider.Result[[]domain.Station], error)
+	Departures(context.Context, string, domain.Options, string) (provider.Result[domain.Departures], error)
 }
 
-func collect(ctx context.Context, p provider, args []string, w io.Writer) error {
+func collect(ctx context.Context, p collectorProvider, args []string, w io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: berlin-transit stations|departures [flags]")
+		return errors.New("usage: berlin-transit stations|departures [flags] | serve")
 	}
 	f := flag.NewFlagSet(args[0], flag.ContinueOnError)
 	f.SetOutput(io.Discard) // flag errors can contain sensitive input.
@@ -37,11 +39,11 @@ func collect(ctx context.Context, p provider, args []string, w io.Writer) error 
 		if err := f.Parse(args[1:]); err != nil || f.NArg() != 0 {
 			return errors.New("usage: berlin-transit stations -query TEXT [-limit 10]")
 		}
-		s, err := p.SearchStations(ctx, *query, *limit)
+		s, err := p.SearchStations(ctx, *query, *limit, "")
 		if err != nil {
 			return err
 		}
-		result = s
+		result = s.Data
 	case "departures":
 		id := f.String("station", "", "opaque provider station ID")
 		mode := f.String("mode", "suburban", "transport product")
@@ -53,36 +55,34 @@ func collect(ctx context.Context, p provider, args []string, w io.Writer) error 
 		if *limit == 0 || *duration == 0 {
 			return vbb.ErrInput
 		}
-		d, err := p.Departures(ctx, *id, domain.Options{Mode: *mode, Limit: *limit, Duration: *duration, Direction: *direction})
+		d, err := p.Departures(ctx, *id, domain.Options{Mode: *mode, Limit: *limit, Duration: *duration, Direction: *direction}, "")
 		if err != nil {
 			return err
 		}
-		result = d
+		result = d.Data
 	default:
-		return errors.New("usage: berlin-transit stations|departures [flags]")
+		return errors.New("usage: berlin-transit stations|departures [flags] | serve")
 	}
 	return json.NewEncoder(w).Encode(result)
 }
 
 func run(ctx context.Context, args []string, stdout io.Writer, getenv func(string) string) error {
-	base := getenv("BERLIN_TRANSIT_VBB_BASE_URL")
-	if base == "" {
-		base = vbb.Origin
+	cfg, err := config.Load(getenv)
+	if err != nil {
+		return err
 	}
-	timeout := 10 * time.Second
-	if v := getenv("BERLIN_TRANSIT_HTTP_TIMEOUT"); v != "" {
-		var err error
-		timeout, err = time.ParseDuration(v)
-		if err != nil {
-			return errors.New("invalid BERLIN_TRANSIT_HTTP_TIMEOUT")
-		}
-	}
-	c, err := vbb.New(base, timeout)
+	c, err := vbb.New(cfg.BaseURL, cfg.HTTPTimeout)
 	if err != nil {
 		return err
 	}
 	defer c.Close()
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	if len(args) > 0 && args[0] == "serve" {
+		if len(args) != 1 {
+			return errors.New("usage: berlin-transit serve (configuration via environment)")
+		}
+		return serve(ctx, cfg, c, observability.Logger(os.Stderr, cfg.LogLevel))
+	}
+	ctx, cancel := context.WithTimeout(ctx, cfg.HTTPTimeout)
 	defer cancel()
 	return collect(ctx, c, args, stdout)
 }

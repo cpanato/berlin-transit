@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/cpanato/berlin-transit/internal/domain"
+	"github.com/cpanato/berlin-transit/internal/provider"
 )
 
 type fakeProvider struct {
@@ -18,15 +19,15 @@ type fakeProvider struct {
 	opts  domain.Options
 }
 
-func (p *fakeProvider) SearchStations(_ context.Context, q string, n int) ([]domain.Station, error) {
+func (p *fakeProvider) SearchStations(_ context.Context, q string, n int, _ string) (provider.Result[[]domain.Station], error) {
 	p.query = q
 	p.limit = n
-	return []domain.Station{{ID: "opaque:001"}}, p.err
+	return provider.Result[[]domain.Station]{Data: []domain.Station{{ID: "opaque:001"}}}, p.err
 }
-func (p *fakeProvider) Departures(_ context.Context, id string, o domain.Options) (domain.Departures, error) {
+func (p *fakeProvider) Departures(_ context.Context, id string, o domain.Options, _ string) (provider.Result[domain.Departures], error) {
 	p.id = id
 	p.opts = o
-	return domain.Departures{Station: domain.Station{ID: id}, Departures: []domain.Departure{}}, p.err
+	return provider.Result[domain.Departures]{Data: domain.Departures{Station: domain.Station{ID: id}, Departures: []domain.Departure{}}}, p.err
 }
 
 func TestCollect(t *testing.T) {
