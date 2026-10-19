@@ -52,26 +52,32 @@ The client accepts only `https://trmnl.com/api/custom_plugins/<token>`, with no
 query, userinfo, custom port, fragment or redirects. Legacy hostnames and BYOS
 servers are not supported by this first adapter.
 
-Build with `make build`, then opt in from a local terminal. This example uses
-Bash's silent prompt, so the URL is not part of the command history:
+Run the helper from the repository:
 
 ```sh
-bash
-read -r -s -p 'TRMNL webhook URL: ' TRMNL_WEBHOOK_URL
-printf '\n'
-export TRMNL_WEBHOOK_URL
-export BERLIN_TRANSIT_COLLECTOR_ENABLED=true
-export BERLIN_TRANSIT_COLLECTOR_STATIONS=900100003
-export BERLIN_TRANSIT_COLLECTOR_INTERVAL=30s
-export BERLIN_TRANSIT_COLLECTOR_LIMIT=8
-export TRMNL_ENABLED=true
-export TRMNL_INTERVAL=5m
-export TRMNL_MAX_DEPARTURES=8
-./dist/berlin-transit serve
-# Ctrl+C stops HTTP and both workers. Then:
-unset TRMNL_WEBHOOK_URL TRMNL_ENABLED BERLIN_TRANSIT_COLLECTOR_ENABLED
-exit
+./scripts/test-trmnl.sh
 ```
+
+It builds the binary, asks for the webhook URL with input hidden, then enables
+S-Bahn collection and TRMNL delivery for **S Buch (Berlin), S2**, station
+`900135001` (ID verified through VBB station search on 2026-10-19). It never saves
+the URL to a file or passes it as a command-line argument. Ctrl+C stops the
+service and its workers; the script's environment does not change your shell.
+
+To choose another station or up to five stations:
+
+```sh
+./scripts/test-trmnl.sh 900100003
+./scripts/test-trmnl.sh 900135001,900100003
+```
+
+Station selection precedence is script argument, existing
+`BERLIN_TRANSIT_COLLECTOR_STATIONS`, then S Buch. The helper selects the generic
+`suburban` product; it does not add a line-specific filter to the API. It reuses
+`TRMNL_WEBHOOK_URL` if already set locally and otherwise requires an interactive
+terminal. Other interval/limit/service environment settings remain configurable
+as below. Running this helper explicitly enables outbound collection/delivery;
+normal `serve` defaults remain disabled.
 
 Enabling collection authorizes the configured VBB queries. Enabling TRMNL
 explicitly sends only the selected stations' normalized public departure data
