@@ -1,7 +1,7 @@
-# Private API (M2)
+# Private API
 
 Start explicitly with `./dist/berlin-transit serve`. The default listener is
-`127.0.0.1:8080`. Only literal loopback IPv4/IPv6 addresses are accepted in M2;
+`127.0.0.1:8080`. Only literal loopback IPv4/IPv6 addresses are accepted;
 there is no wildcard/LAN opt-in, authentication, CORS, public proxy, container
 port publication or deployment. Requests must use the listener's exact Host
 (or `localhost` with the same port). Cross-origin browser requests are rejected.
@@ -19,12 +19,12 @@ server-generated `X-Request-ID`. No incoming request ID is trusted or logged.
 | --- | --- |
 | `/api/v1/stations` | Required `query`, optional `limit` (default 10). Returns `stations`, `source`, `fetched_at`, `stale`, and stale metadata when applicable. |
 | `/api/v1/stations/{id}/departures` | Optional `mode` (default `suburban`), `limit` (10), `duration` (30 minutes), `direction` (provider stop ID). Returns a normalized departures group. |
+| `/api/v1/departures` | Required comma-separated `stations` (1–5 distinct IDs); the same options as single-station departures, applied to every station. Returns ordered per-station results; see below. |
 | `/healthz` | Liveness: `{"status":"ok"}`, independent of VBB. |
 | `/readyz` | Initialized: `{"status":"ready"}`. Does not fail for an upstream outage; becomes not ready during shutdown. |
 | `/metrics` | Disabled by default (404). When enabled, local Prometheus text counters/duration, without station/query labels. |
 
-The multi-station route is M4 and currently returns 404. There is no debug/pprof
-route. Query bounds: search text 1–200 bytes after trimming, opaque IDs 1–256
+There is no debug/pprof route. Query bounds: search text 1–200 bytes after trimming, opaque IDs 1–256
 bytes, results 1–50, duration 1–120 minutes. Modes are `suburban`, `subway`, `tram`,
 `bus`, `ferry`, `express`, `regional`. Direction is a stop ID, not destination
 text. Control characters, unsafe path segments and whitespace in IDs are rejected.
@@ -54,6 +54,60 @@ Times use RFC3339 and Europe/Berlin offsets, including DST. Unknown fields stay
 null, including unknown vs known zero delay. Predictions require evidence of a
 known delay and are absent for cancellations. `realtime` means at least one
 returned departure has a prediction, and is always false for stale responses.
+
+## Multiple stations
+
+```sh
+curl 'http://127.0.0.1:8080/api/v1/departures?stations=900100003,900003201&mode=suburban&limit=5'
+```
+
+`stations` contains 1–5 distinct, nonempty IDs separated by commas, without
+whitespace. Commas are separators, including URL-encoded commas; IDs containing
+a comma must use the single-station route. Duplicates and invalid IDs/options
+reject the entire request with 400 before any collector call. `limit` applies
+per station, not to the combined response (at most 250 departures).
+
+The response preserves input order. Each item has `station_id`, `status`, and
+exactly one of `data` (the complete single-station departures response) or
+`error` (the same sanitized code/message used by single-station errors).
+Retryable errors also include bounded `retry_after_seconds` (1–86400).
+
+```json
+{
+  "results": [
+    {"station_id": "900100003", "status": 200, "data": {
+      "station": {"id": "900100003", "name": null}, "departures": [],
+      "source": "vbb", "fetched_at": "2026-10-19T12:00:00+02:00",
+      "realtime_updated_at": null, "realtime": false, "stale": false
+    }},
+    {"station_id": "900003201", "status": 429,
+     "error": {"code": "rate_limited", "message": "Too Many Requests"},
+     "retry_after_seconds": 2}
+  ],
+  "partial": true
+}
+```
+
+HTTP status is 200 if any station succeeds, including an eligible stale result.
+`partial` is true only when successes and errors coexist; inspect every result.
+If all stations fail, the response still contains `results` and `partial=false`:
+a shared per-station status becomes the HTTP status; differing statuses give
+503. An all-failed response includes `Retry-After` when any item supplies it,
+using the largest per-item delay. Partial success carries retry delays on the
+individual errors rather than the HTTP header.
+
+At most five station reads run concurrently per admitted HTTP request, under
+the existing handler and service concurrency bounds. Reads share the same
+single-station cache, request coalescing, cancellations, timeout and upstream
+budget; there is no separate batch cache, expanded burst or automatic polling.
+An individual failure does not discard other stations. Freshness is per station,
+including `stale`, `realtime`, `last_success_at` and `stale_age_seconds`.
+
+With the default burst-one budget, several cold stations usually cannot all be
+fetched in one call. Which uncached station gets the available slot is not
+guaranteed. Warm individual caches or retry failed stations after their stated
+delay. Retrying a whole batch reuses successful cached entries while they remain
+fresh. A batch creates no delayed queue or additional retry policy.
 
 ## Cache and resilience
 
@@ -139,5 +193,5 @@ The VBB client disables redirects and proxies, validates DNS answers and dials
 only validated public IPs with TLS certificate verification. Responses are capped
 at 2 MiB, headers at 64 KiB and upstream connections at four. The API server uses
 5s read-header, 10s read, `HTTP_TIMEOUT+5s` write and 60s idle timeouts, and a
-16 KiB header limit. M2 has no scheduled polling, TRMNL output, container network
+16 KiB header limit. There is no scheduled polling, TRMNL output, container network
 mapping, deployment or publishing.

@@ -99,3 +99,25 @@ access is required. A query-parser fuzz target is added to CI.
 
 M2 includes no scheduled collection, TRMNL adapter, multi-station endpoint,
 deployment or publication. Those remain separate follow-ups.
+
+## M4: multiple stations
+
+The HTTP adapter composes up to five concurrent calls to the existing small
+collector interface, after validating the entire batch. It retains request order
+and reports per-station data/errors. There is no domain/provider API expansion,
+new runtime dependency, batch cache, polling loop or display-specific model.
+Single-station and batch callers share cache keys, coalescing, the global
+burst-one budget and stale policy. Parallel reads keep the request within the
+existing fetch timeout instead of multiplying it by the station count; each
+worker uses the request context and is joined before the handler returns.
+Per-worker panic recovery retains sanitized HTTP error handling.
+
+Tests cover list validation before collection, five-station bounds, ordering,
+shared options/defaults, mixed successes/errors, freshness preservation,
+all-failed statuses, retry metadata, cancellation and panic sanitization. An
+offline HTTP-to-service-to-mock-VBB test verifies shared single/batch cache use,
+result-affecting keys and rate-budget enforcement. The existing race, coverage,
+lint and security checks apply. Go 1.27.2 was reverified against the official
+release feed on 2026-10-19; existing verified tool pins remain unchanged.
+Optional deployment examples are deferred. No services are exposed publicly,
+and no image publication, release or deployment is introduced.
