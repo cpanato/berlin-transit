@@ -94,3 +94,50 @@ Run `make trmnl-package` to build the local import ZIP. Optional private deploym
 examples remain deferred.
 No deployment, image publication or release is authorized. TRMNL transmission
 requires explicit local configuration and `TRMNL_ENABLED=true`.
+
+## TRMNL (optional)
+
+Display cached departures on a TRMNL private plugin or virtual device, using an
+outbound webhook. Periodic collection and publishing are disabled by default;
+the core API remains independent of the display. No public endpoint is needed.
+
+![TRMNL full-screen S Buch departure board, with S-Bahn symbol, S2 line badges, scheduled and predicted times, delays and cancellation](docs/images/trmnl/full.png)
+
+*Full-screen layout with synthetic S Buch / S2 data. These screenshots illustrate
+the design and are not live departure information.*
+
+1. Run `make trmnl-package` and import `dist/berlin-transit-trmnl.zip` as a private
+   plugin with **Webhook** strategy in your TRMNL account.
+2. Run `./scripts/test-trmnl.sh`. The helper builds the binary, asks for the
+   webhook URL with input hidden, and enables S-Bahn collection and delivery for
+   **S Buch (Berlin), S2**, station `900135001`. This explicitly opts in to VBB
+   queries and sending selected departure data to TRMNL.
+3. Allow up to five minutes for `trmnl_sent`, then preview the plugin. Plugin and
+   device refresh run on their own schedule. Stop the local test with Ctrl+C.
+
+To query another station, pass its ID: `./scripts/test-trmnl.sh 900100003`.
+Keep the webhook URL local; do not put it in Git, screenshots or command arguments.
+To update an existing plugin, replace its layout tabs in **Edit Markup** and
+Save, preserving the current webhook.
+
+<details>
+<summary>Half-screen and quadrant screenshots</summary>
+
+**Half horizontal — 800 × 240**
+
+![TRMNL half-horizontal layout showing the next S2 service from S Buch](docs/images/trmnl/half-horizontal.png)
+
+**Half vertical — 400 × 480**
+
+![TRMNL half-vertical layout with three S2 departures from S Buch](docs/images/trmnl/half-vertical.png)
+
+**Quadrant — 400 × 240**
+
+![TRMNL quadrant layout showing one S2 departure with platform and delay](docs/images/trmnl/quadrant.png)
+
+</details>
+
+See the [TRMNL setup and virtual-device testing guide](integrations/trmnl/README.md)
+for configuration, quotas, stale-data behavior and troubleshooting. Collection
+and snapshot timestamps stay visible: a screen can remain displayed after data
+or connectivity expires. This is a departure snapshot, not a realtime guarantee.

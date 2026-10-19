@@ -38,10 +38,27 @@ support virtual devices.
 The templates use the official [framework](https://trmnl.com/framework) and
 [Liquid screen conventions](https://docs.trmnl.com/go/private-plugins/templates),
 with no scripts, external assets or full-page/view wrappers. All provider text
-is escaped. Full screen displays up to two stations × three departures;
+is escaped. The monochrome S-Bahn board uses a local circular S symbol,
+line badges, a prominent first departure and aligned absolute times. Scheduled
+and predicted times remain distinct; exact whole-minute delays use minutes,
+other delays retain seconds. Cancellation is labeled and its scheduled time is
+struck through. Stale groups say `CACHED` and show the last known delay instead
+of claiming current punctuality. Collection timestamps remain visible.
+
+Full screen shows one station × four departures, or two × two;
 half horizontal two × one; half vertical one × three; quadrant one × one.
-Additional stations are explicitly counted. Adjust the limits after checking
-fit on your device profile. The API never applies these display limits.
+Additional stations are explicitly counted. Scoped inline CSS sets readable
+sizes across framework versions without external images, scripts or assets.
+The API never applies these display limits.
+
+### Update an existing plugin
+
+Open **Edit Markup** on your existing Berlin Transit plugin. Replace each layout
+tab with the corresponding `.liquid` file from this directory, then Save and
+preview. Start with `full.liquid` for the full-screen layout. This keeps the
+existing webhook and incoming data connected. Import new is for creating a
+separate plugin instance and generates a different webhook; use the editor for
+updating the plugin you are already testing.
 
 ## Test the real integration
 
