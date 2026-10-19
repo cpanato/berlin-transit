@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/cpanato/berlin-transit/internal/domain"
+	"unicode/utf8"
 )
 
 var fixedNow = time.Date(2026, 10, 18, 16, 30, 0, 0, time.UTC)
@@ -26,7 +27,19 @@ func writeResponse(t *testing.T, w io.Writer, body string) {
 	}
 }
 
-func mockClient(t *testing.T, h http.HandlerFunc) *Client {
+// Preserve the original normalization assertions through a small test helper.
+type testClient struct{ *Client }
+
+func (c *testClient) SearchStations(ctx context.Context, q string, n int) ([]domain.Station, error) {
+	r, e := c.Client.SearchStations(ctx, q, n, "")
+	return r.Data, e
+}
+func (c *testClient) Departures(ctx context.Context, id string, o domain.Options) (domain.Departures, error) {
+	r, e := c.Client.Departures(ctx, id, o, "")
+	return r.Data, e
+}
+
+func mockClient(t *testing.T, h http.HandlerFunc) *testClient {
 	t.Helper()
 	s := httptest.NewServer(h)
 	t.Cleanup(s.Close)
@@ -38,7 +51,7 @@ func mockClient(t *testing.T, h http.HandlerFunc) *Client {
 		t.Fatal(err)
 	}
 	t.Cleanup(c.Close)
-	return c
+	return &testClient{c}
 }
 
 func TestSearchStations(t *testing.T) {
@@ -64,7 +77,7 @@ func TestDepartureNormalization(t *testing.T) {
 		if r.URL.Path != "/stops/opaque:001/departures" || q.Get("results") != "10" || q.Get("duration") != "30" || q.Get("direction") != "dest:002" {
 			t.Errorf("unexpected request: %s", r.URL)
 		}
-		for _, mode := range modes {
+		for _, mode := range domain.Modes {
 			if q.Get(mode) != fmt.Sprint(mode == "suburban") {
 				t.Errorf("wrong filter %s", mode)
 			}
@@ -138,7 +151,7 @@ func TestResponseFailures(t *testing.T) {
 		{"429", "private upstream body", "upstream_status", 429},
 		{"404", "private upstream body", "upstream_status", 404},
 		{"500", "private upstream body", "upstream_status", 500},
-		{"304", "", "upstream_status", 304},
+		{"304", "", "invalid_response", 304},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := mockClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -305,10 +318,10 @@ func FuzzValidation(f *testing.F) {
 		f.Add(s)
 	}
 	f.Fuzz(func(t *testing.T, s string) {
-		if validID(s) && (!validText(s, 256) || strings.ContainsAny(s, "/\\?#%")) {
+		if domain.ValidID(s) && ((!utf8.ValidString(s) || len(s) > 256) || strings.ContainsAny(s, "/\\?#%")) {
 			t.Fatal("invalid path ID accepted")
 		}
-		_ = validText(strings.TrimSpace(s), 200)
+		_, _ = domain.SearchQuery(strings.TrimSpace(s), 10)
 	})
 }
 

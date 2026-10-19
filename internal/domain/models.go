@@ -36,4 +36,15 @@ type Departures struct {
 	RealtimeUpdatedAt *time.Time  `json:"realtime_updated_at"`
 	Realtime          bool        `json:"realtime"`
 	Stale             bool        `json:"stale"`
+	LastSuccessAt     *time.Time  `json:"last_success_at,omitempty"`
+	StaleAgeSeconds   *int64      `json:"stale_age_seconds,omitempty"`
+}
+
+type Stations struct {
+	Stations        []Station  `json:"stations"`
+	Source          string     `json:"source"`
+	FetchedAt       time.Time  `json:"fetched_at"`
+	Stale           bool       `json:"stale"`
+	LastSuccessAt   *time.Time `json:"last_success_at,omitempty"`
+	StaleAgeSeconds *int64     `json:"stale_age_seconds,omitempty"`
 }

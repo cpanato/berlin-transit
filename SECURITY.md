@@ -9,7 +9,13 @@ without including vulnerability details publicly.
 
 Include the affected revision, reproduction steps and expected impact. Relevant
 issues include upstream destination restriction bypasses, unsafe parsing or
-resource use, sensitive data in errors, and supply-chain compromise.
+resource use, Host/Origin validation bypasses, stale-data misrepresentation,
+sensitive data in errors/logs, and supply-chain compromise.
 
-M1 is a local CLI with outbound VBB HTTPS requests and no listener, telemetry,
-credentials, deployment or publishing. See README.md for transport restrictions.
+CLI queries make outbound VBB HTTPS requests. The explicit `serve` command
+opens only a literal loopback listener, with Host/Origin checks, strict query
+validation, bounded cache/concurrency, rate limits and HTTP timeouts. Metrics
+are disabled by default. There is no authentication; local access is trusted.
+Do not expose the service through a public proxy or port forwarding. There is
+no telemetry, credential requirement, deployment or publishing. See
+[API configuration](docs/api.md) for bounds and operational restrictions.

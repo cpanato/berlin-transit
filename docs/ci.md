@@ -9,10 +9,11 @@ require outbound HTTPS; source analysis happens on the runner.
 
 CI checks formatting, vet, tests, race tests, fuzzing, module integrity/tidiness,
 golangci-lint configuration and analysis, and actionlint. Core executable
-packages under `internal/` must each reach 80% statement coverage; the domain
-package contains only types and has no executable statements. The CLI is
+packages under `internal/` must each reach 80% statement coverage, including
+shared domain validation. The CLI is
 measured but excluded from that gate because `main` exits the process. Cross
 builds cover Linux, macOS and Windows on amd64 and arm64 with CGO disabled.
+Fuzz targets exercise domain input validation, upstream JSON and HTTP query parsing.
 
 Security checks run govulncheck, gosec, Gitleaks over full Git history, and
 Trivy filesystem vulnerability, misconfiguration, secret and license checks.

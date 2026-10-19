@@ -60,6 +60,7 @@ jobs:
         run: |
           go test ./internal/provider/vbb -run '^$' -fuzz '^FuzzValidation$' -fuzztime=10s -parallel=2
           go test ./internal/provider/vbb -run '^$' -fuzz '^FuzzDepartureJSON$' -fuzztime=10s -parallel=2
+          go test ./internal/httpapi -run '^$' -fuzz '^FuzzQuery$' -fuzztime=10s -parallel=2
       - name: Retain coverage report
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
