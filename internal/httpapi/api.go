@@ -182,6 +182,11 @@ func (a *API) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, out)
 		return
 	}
+	if r.URL.Path == "/api/v1/departures" {
+		route = "multi_departures"
+		a.multiDepartures(w, r)
+		return
+	}
 	if strings.HasPrefix(r.URL.Path, "/api/v1/stations/") && strings.HasSuffix(r.URL.Path, "/departures") {
 		route = "departures"
 		id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/v1/stations/"), "/departures")
@@ -239,56 +244,60 @@ func number(q url.Values, name string, def, max int) (int, error) {
 	return n, nil
 }
 
-func retry(w *response, d time.Duration) {
+func retrySeconds(d time.Duration) int64 {
 	n := int64(math.Ceil(d.Seconds()))
-	if n < 1 {
-		n = 1
-	}
-	if n > 86400 {
-		n = 86400
-	}
-	w.Header().Set("Retry-After", strconv.FormatInt(n, 10))
+	return max(1, min(n, 86400))
+}
+
+func retry(w *response, d time.Duration) {
+	w.Header().Set("Retry-After", strconv.FormatInt(retrySeconds(d), 10))
+}
+
+type apiError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 func (a *API) failure(w *response, err error) {
+	status, code, delay := classify(err)
+	if delay != 0 {
+		retry(w, delay)
+	}
+	fail(w, status, code)
+}
+
+func classify(err error) (int, string, time.Duration) {
 	var local *service.Error
 	var upstream *provider.Error
 	switch {
 	case errors.Is(err, domain.ErrInput):
-		fail(w, 400, "invalid_request")
+		return 400, "invalid_request", 0
 	case errors.Is(err, context.Canceled):
-		fail(w, 503, "request_cancelled")
+		return 503, "request_cancelled", 0
 	case errors.Is(err, context.DeadlineExceeded):
-		fail(w, 503, "upstream_timeout")
+		return 503, "upstream_timeout", 0
 	case errors.As(err, &local):
 		switch local.Code {
 		case "rate_limited":
-			retry(w, local.RetryAfter)
-			fail(w, 429, "rate_limited")
+			return 429, "rate_limited", max(local.RetryAfter, time.Nanosecond)
 		case "overloaded":
-			retry(w, time.Second)
-			fail(w, 503, "overloaded")
+			return 503, "overloaded", time.Second
 		default:
-			retry(w, time.Second)
-			fail(w, 503, "unavailable")
+			return 503, "unavailable", time.Second
 		}
 	case errors.As(err, &upstream):
 		switch upstream.Status {
 		case 404:
-			fail(w, 404, "station_not_found")
+			return 404, "station_not_found", 0
 		case 429:
-			retry(w, time.Until(upstream.RetryAt))
-			fail(w, 429, "upstream_rate_limited")
+			return 429, "upstream_rate_limited", max(time.Until(upstream.RetryAt), time.Nanosecond)
 		case 503:
-			fail(w, 503, "upstream_unavailable")
+			return 503, "upstream_unavailable", 0
 		default:
 			if upstream.Code == "unavailable" {
-				fail(w, 503, "upstream_unavailable")
-			} else {
-				fail(w, 502, "bad_gateway")
+				return 503, "upstream_unavailable", 0
 			}
 		}
-	default:
-		fail(w, 502, "bad_gateway")
 	}
+	return 502, "bad_gateway", 0
 }

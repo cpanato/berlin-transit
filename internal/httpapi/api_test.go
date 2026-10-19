@@ -126,9 +126,6 @@ func TestOperationalEndpoints(t *testing.T) {
 	if w := request(a, "/metrics"); w.Code != 404 {
 		t.Error("metrics enabled by default")
 	}
-	if w := request(a, "/api/v1/departures?stations=id"); w.Code != 404 {
-		t.Error("premature multi-station route")
-	}
 	if w := request(a, "/debug/pprof/"); w.Code != 404 {
 		t.Error("debug listener")
 	}
@@ -279,11 +276,11 @@ func TestServerTimeoutsAndJSONFailure(t *testing.T) {
 }
 
 func FuzzQuery(f *testing.F) {
-	for _, s := range []string{"query=Alexanderplatz&limit=10", "mode=suburban&duration=30", "limit=0", "query=%zz", "query=a&query=b", "unknown=x", ""} {
+	for _, s := range []string{"query=Alexanderplatz&limit=10", "mode=suburban&duration=30", "limit=0", "query=%zz", "query=a&query=b", "unknown=x", "stations=a,b", "stations=a,,b", ""} {
 		f.Add(s)
 	}
 	f.Fuzz(func(t *testing.T, s string) {
-		q, err := query(s, "query", "limit", "mode", "duration", "direction")
+		q, err := query(s, "query", "limit", "mode", "duration", "direction", "stations")
 		if err != nil {
 			return
 		}

@@ -1,8 +1,8 @@
 # berlin-transit
 
 A small, display-independent public transport collector and private JSON API in Go.
-Search VBB stations and fetch normalized departures for one station, using the
-CLI or the explicit `serve` command.
+Search VBB stations and fetch normalized departures using the CLI or the explicit
+`serve` command. The HTTP API supports one or several stations.
 S-Bahn (`suburban`) is the default mode. Station IDs are opaque strings; no station
 is hardcoded. There is no telemetry, background polling or publishing.
 
@@ -28,12 +28,14 @@ To start the private HTTP API, run this explicitly in a separate terminal:
 curl http://127.0.0.1:8080/healthz
 curl 'http://127.0.0.1:8080/api/v1/stations?query=Alexanderplatz&limit=5'
 curl 'http://127.0.0.1:8080/api/v1/stations/900100003/departures?mode=suburban&limit=5'
+# Multi-station: inspect each result for data or an error (including rate limits):
+curl 'http://127.0.0.1:8080/api/v1/departures?stations=900100003,900003201&limit=5'
 ```
 
 The service allows 30 upstream requests/minute by default with burst one, so
 separate cache misses within two seconds can return `429`. Respect `Retry-After`.
 Cached queries do not consume upstream budget. `serve` binds only to literal
-loopback IPs; wildcard and LAN/public addresses are rejected in M2. Metrics are
+loopback IPs; wildcard and LAN/public addresses are rejected. Metrics are
 disabled by default. Stop with Ctrl+C for graceful shutdown. See
 [API, configuration and cache semantics](docs/api.md) for all endpoints and bounds.
 
@@ -83,6 +85,8 @@ cache restrictions and supports ETags. There is no automatic polling.
 
 See [architecture and verification notes](docs/architecture.md) and the
 [design](docs/design/berlin-transit-design.md). M1 and M2 are implemented, with
-quality gates from M3 included. Multi-station and optional private deployment
-remain M4; scheduled collection and the opt-in TRMNL adapter remain future work.
+quality gates from M3 included. M4 adds multi-station HTTP queries (up to five
+stations), sharing the existing cache and budget with explicit partial errors.
+Optional private deployment examples are deferred; scheduled collection and the
+opt-in TRMNL adapter remain future work.
 No publication or deployment is authorized.
