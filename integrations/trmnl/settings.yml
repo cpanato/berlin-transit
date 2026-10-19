@@ -1,0 +1,6 @@
+---
+name: Berlin Transit
+strategy: webhook
+refresh_interval: 15
+no_screen_padding: 'no'
+dark_mode: 'no'

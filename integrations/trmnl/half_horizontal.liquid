@@ -1,0 +1,31 @@
+<div class="layout layout--col layout--top">
+  {% for group in stations limit: 2 %}
+  <div class="w--full">
+    <span class="title title--small">{{ group.station.name | default: group.station.id | escape }}</span>
+    <div class="label">{% if group.stale %}CACHED · {% endif %}Collected {{ group.collected_at | date: "%d %b %H:%M %z" | escape }}</div>
+    <table class="table table--small">
+      <thead><tr><th>Line / destination</th><th>Plan</th><th>Pred.</th></tr></thead>
+      <tbody>
+      {% for dep in group.departures limit: 1 %}
+        <tr>
+          <td>{{ dep.line | default: "—" | escape }} {{ dep.direction | default: "—" | escape }}{% if dep.cancelled %} · CANCELLED{% endif %}<br>
+            <span class="label">Platform {{ dep.platform | default: "—" | escape }} · Delay {% if dep.delay_seconds == nil %}unknown{% else %}{{ dep.delay_seconds | escape }} s{% endif %}</span></td>
+          <td>{% if dep.planned_at %}{{ dep.planned_at | date: "%H:%M" | escape }}{% else %}—{% endif %}</td>
+          <td>{% if dep.predicted_at and dep.cancelled == false %}{{ dep.predicted_at | date: "%H:%M" | escape }}{% else %}—{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="3">No departures returned</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <span class="title">No snapshot available</span>
+  {% endfor %}
+  {% if stations.size > 2 %}<span class="label">Showing 2 of {{ stations.size | escape }} stations</span>{% endif %}
+  {% if unavailable_stations.size > 0 %}<span class="label">{{ unavailable_stations.size | escape }} station(s) unavailable</span>{% endif %}
+</div>
+<div class="title_bar">
+  <span class="title">Berlin Transit · VBB</span>
+  <span class="instance">Snapshot {{ generated_at | date: "%H:%M %z" | escape }}</span>
+</div>

@@ -38,6 +38,8 @@ jobs:
         run: |
           make check
           make coverage
+      - name: Build local private-plugin import bundle
+        run: make trmnl-package
       - name: Verify module integrity and tidy state
         run: |
           go mod verify

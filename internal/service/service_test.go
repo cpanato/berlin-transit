@@ -490,3 +490,50 @@ func TestNormalizedPayloadBounds(t *testing.T) {
 		t.Fatalf("invalid normalized data accepted: %v", err)
 	}
 }
+
+func TestCachedDeparturesNeverFetches(t *testing.T) {
+	for _, policy := range []provider.Policy{{}, {NoStore: true}, {Revalidate: true, NoStale: true}, {NoStale: true}} {
+		p := &fake{depart: func(_ context.Context, id string, _ domain.Options, _ string) (provider.Result[domain.Departures], error) {
+			return provider.Result[domain.Departures]{Data: domain.Departures{Station: domain.Station{ID: id}, Departures: []domain.Departure{}, Realtime: true}, Policy: policy}, nil
+		}}
+		s, c := fixture(t, p)
+		if _, ok := s.CachedDepartures("id", domain.Options{}); ok {
+			t.Fatal("no history")
+		}
+		if _, err := s.Departures(context.Background(), "id", domain.Options{}); err != nil {
+			t.Fatal(err)
+		}
+		d, ok := s.CachedDepartures("id", domain.Options{})
+		if ok == (policy.NoStore || policy.Revalidate) {
+			t.Fatal("cache restrictions")
+		}
+		if ok && (d.Stale || !d.Realtime) {
+			t.Fatal(d)
+		}
+		c.Add(31 * time.Second)
+		d, ok = s.CachedDepartures("id", domain.Options{})
+		if ok == (policy.NoStore || policy.Revalidate || policy.NoStale) {
+			t.Fatal("stale restrictions")
+		}
+		if ok && (!d.Stale || d.Realtime || d.LastSuccessAt == nil || *d.StaleAgeSeconds != 31) {
+			t.Fatal(d)
+		}
+		c.Add(5 * time.Minute)
+		if _, ok := s.CachedDepartures("id", domain.Options{}); ok {
+			t.Fatal("expired snapshot")
+		}
+		if _, ok := s.CachedDepartures("../", domain.Options{}); ok {
+			t.Fatal("invalid ID")
+		}
+		if _, ok := s.CachedDepartures("id", domain.Options{Mode: "bus"}); ok {
+			t.Fatal("wrong cache key")
+		}
+		s.Close()
+		if _, ok := s.CachedDepartures("id", domain.Options{}); ok {
+			t.Fatal("closed service")
+		}
+		if p.calls.Load() != 1 {
+			t.Fatal("cache reader fetched", p.calls.Load())
+		}
+	}
+}

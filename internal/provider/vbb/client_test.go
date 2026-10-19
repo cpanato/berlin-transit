@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/netip"
 	"strings"
 	"sync"
 	"testing"
@@ -251,16 +250,6 @@ func TestTransportSafety(t *testing.T) {
 			t.Fatal(err)
 		}
 		c.Close()
-	}
-	for _, ip := range []string{"127.0.0.1", "10.1.2.3", "172.16.1.2", "192.168.1.1", "169.254.1.1", "0.0.0.0", "224.0.0.1", "100.64.1.1", "198.18.0.1", "192.0.2.1", "198.51.100.1", "203.0.113.1", "255.255.255.255", "::1", "::", "fc00::1", "fe80::1", "::ffff:127.0.0.1", "2001:db8::1"} {
-		if publicIP(netip.MustParseAddr(ip)) {
-			t.Errorf("accepted unsafe IP %s", ip)
-		}
-	}
-	for _, ip := range []string{"1.1.1.1", "2606:4700:4700::1111"} {
-		if !publicIP(netip.MustParseAddr(ip)) {
-			t.Errorf("rejected public IP %s", ip)
-		}
 	}
 	for _, addr := range []string{"invalid", "127.0.0.1:443", "v6.vbb.transport.rest:80"} {
 		if conn, err := publicDial(context.Background(), "tcp", addr); err == nil {

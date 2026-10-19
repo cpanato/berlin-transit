@@ -121,3 +121,42 @@ lint and security checks apply. Go 1.27.2 was reverified against the official
 release feed on 2026-10-19; existing verified tool pins remain unchanged.
 Optional deployment examples are deferred. No services are exposed publicly,
 and no image publication, release or deployment is introduced.
+
+## M5: opt-in collection and TRMNL output
+
+`internal/collector` rotates 1–5 configured stations through the existing service,
+using the shared cache, coalescing, timeout and upstream budget. Its minimum
+rotation interval is validated against the budget; requests remain spaced and
+retries cannot create another burst. Each worker is synchronous, with bounded
+state and cancellation-aware sleeps. Both workers are attached to the `serve`
+lifecycle and joined on shutdown, including unexpected HTTP server termination.
+Neither runs for one-shot CLI queries or by default.
+
+`Service.CachedDepartures` exposes immutable normalized cache reads without a
+provider call or freshness extension. The isolated `internal/integrations/trmnl`
+adapter accepts only this cache-reader interface, projects selected fields into
+bounded merge variables, and POSTs replacement snapshots only with explicit
+opt-in. Eligibility respects cache lifetime, no-store/no-cache/must-revalidate
+and maximum stale age; unavailable stations are reported, with no publication
+if none has usable data. Freshness remains per station.
+
+`internal/netguard` holds the existing public-IP validation and validated-literal
+dial behavior shared by VBB and TRMNL. Each client keeps a fixed hostname,
+disables proxies and redirects, and verifies TLS normally. The adapter accepts
+only the official `trmnl.com/api/custom_plugins/<token>` HTTPS webhook pattern;
+errors/logs/configuration diagnostics redact its secret URL. No arbitrary host
+or test override exists in production.
+
+The TRMNL worker has one in-flight request, latest-content replacement,
+content/freshness deduplication, bounded retries on later ticks and Retry-After
+cooldown. Its minimum interval includes retries and conservatively targets the
+standard account quota; restart loses in-memory budget/dedup state. Generation
+time alone does not force sends. No adapter-specific names enter domain models,
+HTTP routes, provider interfaces or collector configuration.
+
+The four private-plugin Liquid layouts and import settings live under
+`integrations/trmnl`; `make trmnl-package` creates a local-only flat ZIP. The
+[adapter guide](../integrations/trmnl/README.md) documents the payload, explicit
+outbound consent, virtual-device preview and live operator smoke test. Official
+TRMNL webhook, private-plugin, template and import docs and Go 1.27.2 were
+rechecked on 2026-10-19. No new Go dependencies or CI tools are introduced.

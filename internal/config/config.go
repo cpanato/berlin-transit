@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/cpanato/berlin-transit/internal/collector"
+	"github.com/cpanato/berlin-transit/internal/integrations/trmnl"
 	"github.com/cpanato/berlin-transit/internal/provider/vbb"
 	"github.com/cpanato/berlin-transit/internal/service"
 )
@@ -19,6 +21,8 @@ type Config struct {
 	MetricsEnabled      bool
 	LogLevel            slog.Level
 	Service             service.Config
+	Collector           collector.Config
+	TRMNL               trmnl.Config
 }
 
 func Load(getenv func(string) string) (Config, error) {
@@ -83,13 +87,15 @@ func Load(getenv func(string) string) (Config, error) {
 		}
 	}
 	c.Service.Timeout = c.HTTPTimeout
+	if err := c.loadBackground(getenv); err != nil {
+		return Config{}, err
+	}
 	return c, nil
 }
 
 func invalid(name string) error { return fmt.Errorf("invalid %s", name) }
 
-// M2 deliberately supports only literal loopback addresses. Remote/private LAN
-// opt-in and deployment controls belong to M4, not a wildcard listener flag.
+// Only literal loopback addresses are accepted; background workers add no listener.
 func LoopbackAddr(addr string) bool {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {

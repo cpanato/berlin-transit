@@ -49,3 +49,45 @@ func TestRejectedConfiguration(t *testing.T) {
 		})
 	}
 }
+
+func TestBackgroundConfiguration(t *testing.T) {
+	env := map[string]string{"BERLIN_TRANSIT_COLLECTOR_ENABLED": "true", "BERLIN_TRANSIT_COLLECTOR_STATIONS": "a,b", "BERLIN_TRANSIT_COLLECTOR_INTERVAL": "1m", "BERLIN_TRANSIT_COLLECTOR_MODE": "bus", "BERLIN_TRANSIT_COLLECTOR_LIMIT": "5", "BERLIN_TRANSIT_COLLECTOR_DURATION": "15", "BERLIN_TRANSIT_COLLECTOR_DIRECTION": "dest", "TRMNL_ENABLED": "true", "TRMNL_WEBHOOK_URL": "https://trmnl.com/api/custom_plugins/test-token", "TRMNL_INTERVAL": "10m", "TRMNL_MAX_DEPARTURES": "4"}
+	c, err := Load(func(k string) string { return env[k] })
+	if err != nil || !c.Collector.Enabled || !c.TRMNL.Enabled || c.Collector.Interval != time.Minute || c.Collector.Options.Mode != "bus" || c.Collector.Options.Limit != 5 || c.Collector.Options.Duration != 15 || c.Collector.Options.Direction != "dest" || c.TRMNL.MaxDepartures != 4 || c.TRMNL.Interval != 10*time.Minute {
+		t.Fatalf("config: %v", err)
+	}
+	for _, tc := range []struct{ name, value string }{
+		{"BERLIN_TRANSIT_COLLECTOR_ENABLED", "invalid"}, {"TRMNL_ENABLED", "invalid"}, {"BERLIN_TRANSIT_COLLECTOR_INTERVAL", "bad"}, {"BERLIN_TRANSIT_COLLECTOR_INTERVAL", "1s"}, {"TRMNL_INTERVAL", "1m"}, {"TRMNL_MAX_DEPARTURES", "0"}, {"TRMNL_MAX_DEPARTURES", "9"}, {"BERLIN_TRANSIT_COLLECTOR_LIMIT", "bad"}, {"BERLIN_TRANSIT_COLLECTOR_DURATION", "121"}, {"BERLIN_TRANSIT_COLLECTOR_STATIONS", "a,a"}, {"BERLIN_TRANSIT_COLLECTOR_STATIONS", "a,"}, {"BERLIN_TRANSIT_COLLECTOR_STATIONS", "../"}, {"BERLIN_TRANSIT_COLLECTOR_STATIONS", strings.Repeat("x", 1285)}, {"BERLIN_TRANSIT_COLLECTOR_STATIONS", "a,b,c,d,e,f"}, {"BERLIN_TRANSIT_COLLECTOR_MODE", "unknown"}, {"BERLIN_TRANSIT_COLLECTOR_DIRECTION", "a/b"}, {"TRMNL_WEBHOOK_URL", "https://private.example/secret"}, {"BERLIN_TRANSIT_COLLECTOR_ENABLED", "false"},
+	} {
+		_, err := Load(func(k string) string {
+			if k == tc.name {
+				return tc.value
+			}
+			return env[k]
+		})
+		if err == nil || strings.Contains(err.Error(), "private.example") {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+	}
+	_, err = Load(func(k string) string {
+		if k == "BERLIN_TRANSIT_COLLECTOR_ENABLED" {
+			return "true"
+		}
+		return ""
+	})
+	if err == nil {
+		t.Fatal("empty station list")
+	}
+	_, err = Load(func(k string) string {
+		if k == "BERLIN_TRANSIT_REQUESTS_PER_MINUTE" {
+			return "1"
+		}
+		if k == "BERLIN_TRANSIT_COLLECTOR_INTERVAL" {
+			return "30s"
+		}
+		return env[k]
+	})
+	if err == nil {
+		t.Fatal("insufficient cycle budget")
+	}
+}
