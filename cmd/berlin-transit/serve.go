@@ -35,7 +35,13 @@ func serve(ctx context.Context, cfg config.Config, p service.Provider, log *slog
 		}
 		defer publisher.Close()
 	}
-	listener, err := net.Listen("tcp", cfg.ListenAddr)
+	network := "tcp"
+	if host, _, _ := net.SplitHostPort(cfg.ListenAddr); host == "0.0.0.0" {
+		// Keep the explicit container exception IPv4-only; tcp can select a
+		// dual-stack IPv6 wildcard even when given an IPv4 unspecified address.
+		network = "tcp4"
+	}
+	listener, err := net.Listen(network, cfg.ListenAddr)
 	if err != nil {
 		return errors.New("listener unavailable")
 	}

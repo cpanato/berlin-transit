@@ -293,3 +293,27 @@ func FuzzQuery(f *testing.F) {
 		_, _ = number(q, "duration", 30, 120)
 	})
 }
+
+func TestContainerListenerHostProtection(t *testing.T) {
+	a, c, _ := apiFixture()
+	a = New(c, a.log, false, "0.0.0.0:8080")
+	for _, host := range []string{"127.0.0.1:8080", "localhost:8080"} {
+		r := httptest.NewRequest("GET", "http://"+host+"/readyz", nil)
+		r.Header.Set("Origin", "http://"+host)
+		w := httptest.NewRecorder()
+		a.ServeHTTP(w, r)
+		if w.Code != 200 {
+			t.Fatalf("%s: %d", host, w.Code)
+		}
+	}
+	for _, host := range []string{"0.0.0.0:8080", "berlin-transit:8080", "172.20.0.2:8080", "evil.example:8080", "127.0.0.1:9000", "[::1]:8080"} {
+		r := httptest.NewRequest("GET", "http://127.0.0.1:8080/readyz", nil)
+		r.Host = host
+		r.Header.Set("X-Forwarded-Host", "127.0.0.1:8080")
+		w := httptest.NewRecorder()
+		a.ServeHTTP(w, r)
+		if w.Code != 403 {
+			t.Fatalf("unsafe Host %s: %d", host, w.Code)
+		}
+	}
+}

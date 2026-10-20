@@ -68,6 +68,8 @@ jobs:
         run: |
           .tools/bin/trivy fs --scanners vuln,misconfig,secret,license --license-full \
             --severity HIGH,CRITICAL --exit-code 1 --skip-dirs .git,.tools,dist .
+      - name: Validate private Compose policy without starting services
+        run: python3 scripts/check-compose.py
       - name: Build local image only
         run: docker build --tag berlin-transit:ci .
       - name: Verify container defaults and restricted execution
@@ -84,6 +86,18 @@ jobs:
           set -e
           test "$status" -eq 1
           test "$output" = 'invalid BERLIN_TRANSIT_HTTP_TIMEOUT'
+          # Exercise the native probe with no service/network/port publication.
+          set +e
+          output=$(docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --memory 64m --cpus 1 --pids-limit 32 \
+            -e BERLIN_TRANSIT_LISTEN_ADDR=0.0.0.0:8080 \
+            -e BERLIN_TRANSIT_ALLOW_CONTAINER_LISTEN=true \
+            berlin-transit:ci healthcheck 2>&1)
+          status=$?
+          set -e
+          test "$status" -eq 1
+          test "$output" = 'service not ready'
       - name: Scan image
         run: .tools/bin/trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 berlin-transit:ci
       - name: Generate local SBOM

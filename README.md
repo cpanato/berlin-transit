@@ -7,8 +7,8 @@ S-Bahn (`suburban`) is the default mode. Station IDs are opaque strings; no stat
 is hardcoded. There is no telemetry. Periodic collection and TRMNL publishing
 are optional and disabled by default.
 
-Requires Go **1.27.2**, verified against the [official stable release feed](https://go.dev/dl/?mode=json)
-on 2026-10-19. The module uses only the Go standard library and bundled timezone
+Requires Go **1.27.3**, verified against the [official stable release feed](https://go.dev/dl/?mode=json)
+on 2026-10-20. The module uses only the Go standard library and bundled timezone
 data, with no external Go runtime dependencies. Consequently
 there is no `go.sum`. The Go directive selects the verified patched minimum;
 use the latest patched stable Go for development.
@@ -36,7 +36,9 @@ curl 'http://127.0.0.1:8080/api/v1/departures?stations=900100003,900003201&limit
 The service allows 30 upstream requests/minute by default with burst one, so
 separate cache misses within two seconds can return `429`. Respect `Retry-After`.
 Cached queries do not consume upstream budget. `serve` binds only to literal
-loopback IPs; wildcard and LAN/public addresses are rejected. Metrics are
+loopback IPs by default; LAN/public addresses are rejected. The optional
+[private Compose setup](docs/deployment.md) uses a separate, explicit
+container-listener opt-in with loopback-only host publication. Metrics are
 disabled by default. Stop with Ctrl+C for graceful shutdown. See
 [API, configuration and cache semantics](docs/api.md) for all endpoints and bounds.
 
@@ -90,8 +92,9 @@ quality gates from M3 included. M4 adds multi-station HTTP queries (up to five
 stations), sharing the existing cache and budget with explicit partial errors.
 M5 adds optional scheduled collection and a disabled-by-default
 [TRMNL webhook adapter with virtual-device testing](integrations/trmnl/README.md).
-Run `make trmnl-package` to build the local import ZIP. Optional private deployment
-examples remain deferred.
+Run `make trmnl-package` to build the local import ZIP. The deferred M4
+[private Docker Compose setup](docs/deployment.md) is now available for explicit
+operator-managed use; K3s examples remain deferred.
 No deployment, image publication or release is authorized. TRMNL transmission
 requires explicit local configuration and `TRMNL_ENABLED=true`.
 
@@ -141,3 +144,21 @@ See the [TRMNL setup and virtual-device testing guide](integrations/trmnl/README
 for configuration, quotas, stale-data behavior and troubleshooting. Collection
 and snapshot timestamps stay visible: a screen can remain displayed after data
 or connectivity expires. This is a departure snapshot, not a realtime guarantee.
+
+## Private Docker Compose
+
+The [local operations guide](docs/deployment.md) covers configuration outside
+Git, building locally, explicitly starting/stopping, TRMNL opt-in, updates and
+troubleshooting. Compose publishes only `127.0.0.1:8080`, runs the non-root image
+with a read-only filesystem and resource limits, and uses the binary's own
+`healthcheck` command. Background collection and TRMNL stay off in the example
+until you enable them. Restart policy applies only after you start the service.
+
+Validate the example without starting anything or reading a local `.env`:
+
+```sh
+python3 scripts/check-compose.py
+```
+
+Go 1.27.3 and its pinned official builder image were verified on 2026-10-20.
+CI validates/builds only; it never starts this Compose service or publishes images.

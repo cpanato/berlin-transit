@@ -27,7 +27,7 @@ type collectorProvider interface {
 
 func collect(ctx context.Context, p collectorProvider, args []string, w io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: berlin-transit stations|departures [flags] | serve")
+		return errors.New("usage: berlin-transit stations|departures [flags] | serve | healthcheck")
 	}
 	f := flag.NewFlagSet(args[0], flag.ContinueOnError)
 	f.SetOutput(io.Discard) // flag errors can contain sensitive input.
@@ -61,7 +61,7 @@ func collect(ctx context.Context, p collectorProvider, args []string, w io.Write
 		}
 		result = d.Data
 	default:
-		return errors.New("usage: berlin-transit stations|departures [flags] | serve")
+		return errors.New("usage: berlin-transit stations|departures [flags] | serve | healthcheck")
 	}
 	return json.NewEncoder(w).Encode(result)
 }
@@ -70,6 +70,12 @@ func run(ctx context.Context, args []string, stdout io.Writer, getenv func(strin
 	cfg, err := config.Load(getenv)
 	if err != nil {
 		return err
+	}
+	if len(args) > 0 && args[0] == "healthcheck" {
+		if len(args) != 1 {
+			return errors.New("usage: berlin-transit healthcheck")
+		}
+		return healthcheck(ctx, cfg.ListenAddr)
 	}
 	c, err := vbb.New(cfg.BaseURL, cfg.HTTPTimeout)
 	if err != nil {

@@ -1,6 +1,6 @@
 # Contributing
 
-Use the latest patched stable Go release (currently verified: 1.27.2). Run
+Use the latest patched stable Go release (currently verified: 1.27.3). Run
 `make fmt`, `make check`, `make coverage` and `go mod tidy` before submitting.
 Run `go -C tools mod tidy` when changing the isolated scanner module.
 `make coverage` enforces at least 80% statement coverage per core package.

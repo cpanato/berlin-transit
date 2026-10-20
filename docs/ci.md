@@ -89,7 +89,7 @@ go -C tools build -o ../.tools/bin/govulncheck golang.org/x/vuln/cmd/govulncheck
 
 ## Container build validation
 
-The Dockerfile builds from the official `golang:1.27.2-bookworm` image pinned to
+The Dockerfile builds from the official `golang:1.27.3-bookworm` image pinned to
 the manifest digest verified with `docker buildx imagetools inspect`. The runtime
 uses Docker's built-in empty `scratch` filesystem, carrying only the static CLI
 and CA trust bundle, and runs as UID/GID 65532. Timezone data is embedded in Go.
@@ -103,3 +103,13 @@ verifies the expected startup error, so no upstream request occurs. Image
 metadata is checked for the non-root user and absence of exposed ports.
 Runtime restrictions belong in `docker run` or the deployment runtime and cannot
 be enforced by a Dockerfile alone. No container is deployed or kept running.
+
+The container job also runs `python3 scripts/check-compose.py`, using only a
+copy of `.env.example` in a temporary directory. It resolves Compose and checks
+loopback-only publication, Host-related environment overrides, disabled workers,
+non-root/read-only/capability restrictions, health command, bounded resources,
+NAT bridge settings and local logging. It never reads an operator `.env`, starts
+Compose, publishes a port or sends to VBB/TRMNL. Python uses only its standard
+library. Installed Docker Engine 29.8.2 and Compose 5.6.0 were checked against
+official Docker release notes on 2026-10-20. Go 1.27.3 and the builder image's
+immutable digest were verified from the official Go feed and Docker Hub tag API.
