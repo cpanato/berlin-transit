@@ -16,13 +16,14 @@ import (
 )
 
 type Config struct {
-	ListenAddr, BaseURL string
-	HTTPTimeout         time.Duration
-	MetricsEnabled      bool
-	LogLevel            slog.Level
-	Service             service.Config
-	Collector           collector.Config
-	TRMNL               trmnl.Config
+	ListenAddr, BaseURL  string
+	HTTPTimeout          time.Duration
+	MetricsEnabled       bool
+	AllowContainerListen bool
+	LogLevel             slog.Level
+	Service              service.Config
+	Collector            collector.Config
+	TRMNL                trmnl.Config
 }
 
 func Load(getenv func(string) string) (Config, error) {
@@ -33,7 +34,16 @@ func Load(getenv func(string) string) (Config, error) {
 			*dest = v
 		}
 	}
-	if !LoopbackAddr(c.ListenAddr) {
+	if raw := getenv("BERLIN_TRANSIT_ALLOW_CONTAINER_LISTEN"); raw != "" {
+		b, err := strconv.ParseBool(raw)
+		if err != nil {
+			return Config{}, invalid("BERLIN_TRANSIT_ALLOW_CONTAINER_LISTEN")
+		}
+		c.AllowContainerListen = b
+	}
+	ip, valid := listenIP(c.ListenAddr)
+	allowed := ip.IsLoopback() || (c.AllowContainerListen && ip == netip.IPv4Unspecified())
+	if !valid || !allowed {
 		return Config{}, invalid("BERLIN_TRANSIT_LISTEN_ADDR")
 	}
 	if c.BaseURL != vbb.Origin && c.BaseURL != vbb.Origin+"/" {
@@ -95,16 +105,21 @@ func Load(getenv func(string) string) (Config, error) {
 
 func invalid(name string) error { return fmt.Errorf("invalid %s", name) }
 
-// Only literal loopback addresses are accepted; background workers add no listener.
+// LoopbackAddr is also used by the health probe, which never accepts remote URLs.
 func LoopbackAddr(addr string) bool {
+	ip, ok := listenIP(addr)
+	return ok && ip.IsLoopback()
+}
+
+func listenIP(addr string) (netip.Addr, bool) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
-		return false
+		return netip.Addr{}, false
 	}
 	ip, err := netip.ParseAddr(host)
-	if err != nil || !ip.IsLoopback() {
-		return false
+	if err != nil || ip.Zone() != "" {
+		return netip.Addr{}, false
 	}
 	p, err := strconv.Atoi(port)
-	return err == nil && p >= 1 && p <= 65535
+	return ip, err == nil && p >= 1 && p <= 65535
 }

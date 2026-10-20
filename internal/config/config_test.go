@@ -12,7 +12,7 @@ func TestDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.ListenAddr != "127.0.0.1:8080" || c.MetricsEnabled || c.HTTPTimeout != 10*time.Second || c.LogLevel != slog.LevelInfo || c.Service.Timeout != c.HTTPTimeout || c.Service.RequestsPerMinute != 30 || c.Service.CacheEntries != 256 || c.Service.CacheBytes != 16<<20 || c.Service.MaxStale != 5*time.Minute || c.Service.StationsTTL != 24*time.Hour || c.Service.DeparturesTTL != 30*time.Second {
+	if c.ListenAddr != "127.0.0.1:8080" || c.AllowContainerListen || c.MetricsEnabled || c.HTTPTimeout != 10*time.Second || c.LogLevel != slog.LevelInfo || c.Service.Timeout != c.HTTPTimeout || c.Service.RequestsPerMinute != 30 || c.Service.CacheEntries != 256 || c.Service.CacheBytes != 16<<20 || c.Service.MaxStale != 5*time.Minute || c.Service.StationsTTL != 24*time.Hour || c.Service.DeparturesTTL != 30*time.Second {
 		t.Fatalf("bad defaults: %+v", c)
 	}
 }
@@ -89,5 +89,47 @@ func TestBackgroundConfiguration(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("insufficient cycle budget")
+	}
+}
+
+func TestContainerListenerOptIn(t *testing.T) {
+	c, err := Load(func(k string) string {
+		if k == "BERLIN_TRANSIT_ALLOW_CONTAINER_LISTEN" {
+			return "true"
+		}
+		return ""
+	})
+	if err != nil || c.ListenAddr != "127.0.0.1:8080" {
+		t.Fatal("flag changed default bind", err)
+	}
+
+	for _, tc := range []struct {
+		addr, flag string
+		valid      bool
+	}{
+		{"0.0.0.0:8080", "true", true}, {"0.0.0.0:8080", "false", false}, {"0.0.0.0:8080", "", false}, {"127.0.0.1:8080", "true", true},
+		{"[::]:8080", "true", false}, {"192.168.1.2:8080", "true", false}, {"8.8.8.8:8080", "true", false}, {"localhost:8080", "true", false}, {":8080", "true", false},
+		{"0.0.0.0:0", "true", false}, {"0.0.0.0:65536", "true", false}, {"[::1%lo0]:8080", "true", false}, {"127.0.0.1:8080", "invalid", false},
+	} {
+		c, err := Load(func(k string) string {
+			switch k {
+			case "BERLIN_TRANSIT_LISTEN_ADDR":
+				return tc.addr
+			case "BERLIN_TRANSIT_ALLOW_CONTAINER_LISTEN":
+				return tc.flag
+			}
+			return ""
+		})
+		if (err == nil) != tc.valid {
+			t.Fatalf("%s flag=%s: %v", tc.addr, tc.flag, err)
+		}
+		if err == nil && !c.AllowContainerListen {
+			t.Fatal("explicit flag lost")
+		}
+	}
+	for _, addr := range []string{"0.0.0.0:8080", "[::]:8080", "example.com:80", "invalid"} {
+		if LoopbackAddr(addr) {
+			t.Fatal("probe accepted non-loopback", addr)
+		}
 	}
 }

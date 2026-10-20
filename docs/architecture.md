@@ -12,10 +12,11 @@ HTTP-specific metadata out of domain models. The original CLI output is preserve
 
 Official sources: [Go release feed](https://go.dev/dl/?mode=json),
 [VBB API documentation](https://v6.vbb.transport.rest/api.html).
-Go 1.27.2 is the latest stable patch in the feed and the installed toolchain.
+Go 1.27.2 was the latest stable patch and installed toolchain at M1 verification.
 The runtime uses only the standard library; separate CI tools and their official
 sources are documented in [ci.md](ci.md). The Go release feed and VBB documentation
-were rechecked on 2026-10-19; Go 1.27.2 remains the latest patched stable release.
+were rechecked on 2026-10-19; Go 1.27.2 was still current then. The private
+Compose follow-up below upgrades to verified Go 1.27.3 on 2026-10-20.
 
 Conservative live GET checks revealed an incompatibility in the proposed design:
 `/stations?query=Alexanderplatz&limit=1` returned an object of IFOPT station IDs
@@ -160,3 +161,29 @@ The four private-plugin Liquid layouts and import settings live under
 outbound consent, virtual-device preview and live operator smoke test. Official
 TRMNL webhook, private-plugin, template and import docs and Go 1.27.2 were
 rechecked on 2026-10-19. No new Go dependencies or CI tools are introduced.
+
+## Private Compose operations (deferred M4)
+
+`compose.yaml` prepares one local-built service with a loopback-only host port,
+explicit container-only IPv4 wildcard listener, disabled workers by default,
+non-root/read-only execution, dropped capabilities, no-new-privileges, bounded
+CPU/memory/PIDs/logging and an operator-selected restart policy. It grants no
+host mounts, Docker socket, privileged access or public host address. Outbound
+DNS/HTTPS on its standard NAT bridge is needed for enabled VBB/TRMNL features;
+custom routing and network controls remain operator responsibilities.
+
+The listener exception accepts only `0.0.0.0:<port>` with an explicit environment
+flag and pins Go's listener to tcp4. HTTP Host/Origin checks continue to allow
+only loopback/localhost names at the listener port. A native `healthcheck`
+command validates local readiness, with bounded HTTP/timeouts and no provider
+client or publishing side effects; scratch needs no extra binaries.
+
+Compose's `.env` input is local/untracked, raw-parsed and excluded from build
+context. Fixed Compose environment values override attempts to change listener
+or metrics settings through that file. The policy check uses a temporary copy
+of the example and never reads operator secrets. CI validates configuration and
+builds images but never starts Compose. Runtime/port-forwarding validation and
+live health transitions remain operator smoke tests; no deployment was performed.
+Go 1.27.3, the official builder digest, Docker Engine 29.8.2 and Compose 5.6.0 were
+verified on 2026-10-20. Historical M1–M5 verification notes above retain the
+versions used at those milestones. No Go dependencies are added.

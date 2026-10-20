@@ -38,8 +38,13 @@ type API struct {
 }
 
 func New(c Collector, log *slog.Logger, metrics bool, addr string) *API {
-	_, port, _ := net.SplitHostPort(addr)
+	host, port, _ := net.SplitHostPort(addr)
 	a := &API{collector: c, log: log, metricsEnabled: metrics, hosts: map[string]bool{addr: true, net.JoinHostPort("localhost", port): true}, active: make(chan struct{}, 128)}
+	if host == "0.0.0.0" {
+		// Container port forwarding preserves the caller's loopback Host. Never
+		// trust a wildcard, container IP, service name or arbitrary forwarded Host.
+		a.hosts = map[string]bool{net.JoinHostPort("127.0.0.1", port): true, net.JoinHostPort("localhost", port): true}
+	}
 	a.ready.Store(true)
 	return a
 }

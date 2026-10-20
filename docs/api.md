@@ -1,9 +1,9 @@
 # Private API
 
 Start explicitly with `./dist/berlin-transit serve`. The default listener is
-`127.0.0.1:8080`. Only literal loopback IPv4/IPv6 addresses are accepted;
-there is no wildcard/LAN opt-in, authentication, CORS, public proxy, container
-port publication or deployment. Requests must use the listener's exact Host
+`127.0.0.1:8080`. Only literal loopback IPv4/IPv6 addresses are accepted by default;
+the explicit container-only listener exception is described below. There is no
+authentication, CORS or public proxy. By default, requests use the listener's exact Host
 (or `localhost` with the same port). Cross-origin browser requests are rejected.
 The outbound VBB HTTPS request is necessary for uncached queries and is separate
 from publishing or exposing this service.
@@ -177,7 +177,8 @@ is validated at startup; errors name the variable without echoing its value.
 
 | Variable (`BERLIN_TRANSIT_` prefix) | Default | Bounds |
 | --- | --- | --- |
-| `LISTEN_ADDR` | `127.0.0.1:8080` | Literal loopback IP, port 1–65535; e.g. `[::1]:8080` |
+| `LISTEN_ADDR` | `127.0.0.1:8080` | Literal loopback IP, port 1–65535; e.g. `[::1]:8080`. Exact `0.0.0.0` requires container opt-in. |
+| `ALLOW_CONTAINER_LISTEN` | `false` | Explicitly permits IPv4 `0.0.0.0` inside an isolated container network; use only with loopback host publication. |
 | `VBB_BASE_URL` | `https://v6.vbb.transport.rest` | Exact allowlisted HTTPS origin; optional trailing slash |
 | `HTTP_TIMEOUT` | `10s` | 1ms–1m overall fetch timeout |
 | `DEPARTURES_TTL` | `30s` | 1ms–5m |
@@ -195,5 +196,27 @@ at 2 MiB, headers at 64 KiB and upstream connections at four. The API server use
 5s read-header, 10s read, `HTTP_TIMEOUT+5s` write and 60s idle timeouts, and a
 16 KiB header limit. Optional scheduled collection and TRMNL output are disabled
 by default; see the [adapter guide](../integrations/trmnl/README.md) for opt-in
-configuration and virtual-device testing. There is no container network mapping,
-deployment or image/release publication.
+configuration and virtual-device testing. The optional [private Compose example](deployment.md) prepares loopback host
+publication with an isolated container listener. Starting it is an explicit
+operator action; there is no automatic deployment or image/release publication.
+
+## Container listener and health probe
+
+`BERLIN_TRANSIT_ALLOW_CONTAINER_LISTEN=true` additionally permits only literal
+IPv4 `0.0.0.0:<port>` (1–65535), using a `tcp4` listener inside an isolated
+container network. LAN/public literal addresses, arbitrary hostnames, empty-host
+wildcards and IPv6 unspecified addresses remain invalid even with opt-in. The
+flag alone keeps the existing default loopback address. Running this exception
+on a host or mapping it to a public host interface is outside the private setup.
+
+For the container listener, HTTP Host/Origin checks accept only
+`127.0.0.1:<container-port>` or `localhost:<container-port>`. Wildcard/container
+IPs, service names and forwarded Host headers are not trusted. The provided
+Compose file fixes the same container/host port 8080 and pins host publication to
+127.0.0.1. These checks do not replace network isolation or authentication.
+
+`berlin-transit healthcheck` checks the existing `/readyz` over loopback with a
+2s timeout, no proxy/redirects and a 1 KiB JSON body bound. It validates
+`{"status":"ready"}` and returns zero on success, or a fixed error/nonzero exit.
+It converts the explicit container wildcard to 127.0.0.1 and never creates a
+VBB client or invokes background workers. No shell/curl is needed in scratch.
