@@ -7,11 +7,10 @@ S-Bahn (`suburban`) is the default mode. Station IDs are opaque strings; no stat
 is hardcoded. There is no telemetry. Periodic collection and TRMNL publishing
 are optional and disabled by default.
 
-Requires Go **1.27.3**, verified against the [official stable release feed](https://go.dev/dl/?mode=json)
-on 2026-10-20. The module uses only the Go standard library and bundled timezone
-data, with no external Go runtime dependencies. Consequently
-there is no `go.sum`. The Go directive selects the verified patched minimum;
-use the latest patched stable Go for development.
+Use the latest patched stable Go release; [go.mod](go.mod) defines the minimum
+required toolchain. Check the [official stable release feed](https://go.dev/dl/?mode=json)
+when updating it. The module uses only the Go standard library and bundled
+timezone data, with no external Go runtime dependencies, so there is no `go.sum`.
 
 ```sh
 make check
@@ -157,8 +156,16 @@ until you enable them. Restart policy applies only after you start the service.
 Validate the example without starting anything or reading a local `.env`:
 
 ```sh
-python3 scripts/check-compose.py
+make compose-check
 ```
 
-Go 1.27.3 and its pinned official builder image were verified on 2026-10-20.
 CI validates/builds only; it never starts this Compose service or publishes images.
+
+## Local snapshots and optional Helm chart
+
+GoReleaser with ko builds local binaries and Linux amd64/arm64 image snapshots.
+The optional Helm chart uses ClusterIP, restricted pods and a default egress
+policy; collection and TRMNL require explicit opt-in. CI renders and tests the
+chart without installing it. See [packaging and release policy](docs/releases.md)
+and the [Helm chart guide](charts/berlin-transit/README.md) for setup and limits.
+No image, chart or release is published automatically.

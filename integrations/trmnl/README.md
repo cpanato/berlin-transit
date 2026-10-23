@@ -77,7 +77,7 @@ Run the helper from the repository:
 
 It builds the binary, asks for the webhook URL with input hidden, then enables
 S-Bahn collection and TRMNL delivery for **S Buch (Berlin), S2**, station
-`900135001` (ID verified through VBB station search on 2026-10-19). It never saves
+`900135001`. It never saves
 the URL to a file or passes it as a command-line argument. Ctrl+C stops the
 service and its workers; the script's environment does not change your shell.
 
@@ -189,5 +189,4 @@ promise of realtime accuracy, automated screen expiry or five-minute display
 refresh. Physical e-ink behavior is outside the offline tests; complete the
 virtual-device preview and then check on hardware if available.
 
-Official contracts and Go's patched stable feed were checked on 2026-10-19.
 No new runtime or development dependencies are required.

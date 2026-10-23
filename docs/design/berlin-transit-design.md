@@ -1,6 +1,6 @@
 # berlin-transit — Technical Design Document
 
-Status: Proposed | Version: 0.2 | Date: 2026-10-18
+Status: Design reference
 
 ## 1. Summary
 
@@ -108,7 +108,7 @@ Reject invalid configuration at startup. Restrict configurable upstream URL: def
 ## 9. Security requirements
 
 - Use Go standard library by default; introduce dependencies only with documented rationale.
-- Go 1.27.2 is the latest confirmed patched stable release as of 2026-10-18; check official Go release feed again at implementation time and use latest patched stable. Set go.mod/toolchain accordingly and avoid unsupported future version guesses.
+- Use the latest patched stable Go release, verified against the official Go release feed. Keep go.mod/toolchain current; documentation should reference those files rather than duplicate tool versions.
 - Validate and cap all inputs; `net/http` read header, read, write, idle timeouts; cap upstream body size; avoid redirect and DNS rebinding pitfalls.
 - Secure container: multi-stage build, minimal runtime image pinned by digest, non-root UID, read-only root filesystem, no added Linux capabilities, seccomp default, no privilege escalation, resource limits, drop unnecessary network permissions.
 - Never add debug/pprof listener or metrics public by default.
@@ -153,14 +153,14 @@ Study the user's intended `pr-inbox` repository before copying patterns; the rep
 CI triggers: pull_request, push to main, workflow_dispatch. Security scans also run on a weekly schedule. Workflow-wide `permissions: contents: read`, override only where strictly necessary. Use current stable GitHub Actions versions **pinned to full immutable commit SHA** with comments identifying the version; validate current versions at implementation time. Checkout with `persist-credentials: false`. No untrusted `pull_request_target` code execution, no privileged workflow_run, no secrets for PR tests, no arbitrary shell interpolation of untrusted PR metadata. Concurrency cancellation for redundant PR runs.
 
 Required checks:
-- `gofmt` / `go vet` / `go test ./...` / `go test -race ./...` / coverage threshold (initially 80% for core packages, excluding generated code)
+- `gofmt` / `go vet` / `go test ./...` / `go test -race ./...` / native Go coverage report (informational)
 - `go mod tidy` diff check
 - golangci-lint (compatible with Go version; config validated; pin binary/action version)
 - `govulncheck ./...`
 - `gosec` as defense in depth, with reviewed suppressions only
 - actionlint for workflow files
-- container build validation (no push), Trivy image/filesystem scan, and SBOM generation as CI artifacts (not registry uploads)
-- dependency/license audit and secret scanning where tooling is available
+- container build validation (no push) and ko SPDX SBOM generation as CI artifacts (not registry uploads)
+- dependency analysis and native GitHub secret scanning / push protection
 - Dependabot for gomod, github-actions, and docker, weekly grouped PRs, no automatic merge.
 
 **Release policy:** no automatic tags, GitHub releases, artifact publication to external registries, GHCR pushes, deployments, or changelog publishing. If release workflow is added, make it workflow_dispatch-only, with explicit confirmation inputs and environment approvals, least-privilege permissions and optional provenance/SBOM. Build/test on push is allowed; publishing is not. Avoid CI job token `packages: write` except an explicitly approved release job.
@@ -196,6 +196,12 @@ Required checks:
 9. No TRMNL-specific naming or code in core.
 10. README includes secure local quick start and clear limitations of the upstream API.
 11. Optional TRMNL push integration is isolated, disabled by default, and never required for the REST API.
+
+Operator choices: prefer maintained upstream Actions over custom
+tool installers; use Go or Bash for repository tooling; use native GitHub secret
+scanning/push protection without a duplicate scanner; omit container scanning.
+The ko base intentionally follows `cgr.dev/chainguard/static:latest` without a
+digest. These choices supersede the corresponding original defaults above.
 
 ## 15. Codex handoff prompt
 

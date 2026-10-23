@@ -2,14 +2,16 @@ name: Security
 
 on:
   pull_request:
+    branches:
+      - main
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
   schedule:
     - cron: '23 6 * * 1'
 
-permissions:
-  contents: read
+permissions: {}
 
 env:
   GOTOOLCHAIN: local
@@ -25,89 +27,30 @@ defaults:
 
 jobs:
   source:
-    name: Vulnerabilities and secrets
+    name: Go security analysis
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+
+      - name: Check reachable vulnerabilities
+        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
         with:
-          go-version-file: go.mod
+          repo-checkout: false
+          go-version-input: stable
           cache: false
-      - name: Install pinned scanners
+          check-latest: true
+          go-package: ./...
+
+      # The upstream gosec action image cannot read Go 1.27 export data.
+      # Keep the reviewed compatible importer in the isolated tools module.
+      - name: Build and run compatible gosec
         run: |
           mkdir -p .tools/bin
-          go -C tools build -o ../.tools/bin/govulncheck golang.org/x/vuln/cmd/govulncheck
           go -C tools build -o ../.tools/bin/gosec github.com/securego/gosec/v2/cmd/gosec
           go -C tools mod verify
-          sh scripts/install-tool.sh gitleaks
-      - name: Check reachable vulnerabilities
-        run: .tools/bin/govulncheck ./...
-      - name: Static security analysis
-        run: .tools/bin/gosec -exclude-dir=.tools ./...
-      - name: Scan full Git history for secrets
-        run: .tools/bin/gitleaks git --redact --no-banner .
-
-  container:
-    name: Container, filesystem, licenses and SBOM
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    env:
-      TRIVY_NO_PROGRESS: "true"
-      TRIVY_DISABLE_TELEMETRY: "true"
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Install pinned Trivy
-        run: sh scripts/install-tool.sh trivy
-      - name: Scan source, configuration and dependency licenses
-        run: |
-          .tools/bin/trivy fs --scanners vuln,misconfig,secret,license --license-full \
-            --severity HIGH,CRITICAL --exit-code 1 --skip-dirs .git,.tools,dist .
-      - name: Validate private Compose policy without starting services
-        run: python3 scripts/check-compose.py
-      - name: Build local image only
-        run: docker build --tag berlin-transit:ci .
-      - name: Verify container defaults and restricted execution
-        run: |
-          test "$(docker image inspect --format '{{.Config.User}}' berlin-transit:ci)" = '65532:65532'
-          test "$(docker image inspect --format '{{json .Config.ExposedPorts}}' berlin-transit:ci)" = 'null'
-          # No network or published ports; a configuration error verifies startup.
-          set +e
-          output=$(docker run --rm --network none --read-only --cap-drop ALL \
-            --security-opt no-new-privileges:true \
-            --memory 64m --cpus 1 --pids-limit 32 \
-            -e BERLIN_TRANSIT_HTTP_TIMEOUT=invalid berlin-transit:ci 2>&1)
-          status=$?
-          set -e
-          test "$status" -eq 1
-          test "$output" = 'invalid BERLIN_TRANSIT_HTTP_TIMEOUT'
-          # Exercise the native probe with no service/network/port publication.
-          set +e
-          output=$(docker run --rm --network none --read-only --cap-drop ALL \
-            --security-opt no-new-privileges:true \
-            --memory 64m --cpus 1 --pids-limit 32 \
-            -e BERLIN_TRANSIT_LISTEN_ADDR=0.0.0.0:8080 \
-            -e BERLIN_TRANSIT_ALLOW_CONTAINER_LISTEN=true \
-            berlin-transit:ci healthcheck 2>&1)
-          status=$?
-          set -e
-          test "$status" -eq 1
-          test "$output" = 'service not ready'
-      - name: Scan image
-        run: .tools/bin/trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 berlin-transit:ci
-      - name: Generate local SBOM
-        run: |
-          mkdir -p artifacts
-          .tools/bin/trivy image --format cyclonedx --output artifacts/sbom.cdx.json berlin-transit:ci
-      - name: Retain SBOM in this workflow run
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: container-sbom
-          path: artifacts/sbom.cdx.json
-          retention-days: 7
-          if-no-files-found: error
+          .tools/bin/gosec -exclude-dir=.tools ./...

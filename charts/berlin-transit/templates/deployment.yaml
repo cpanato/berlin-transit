@@ -1,0 +1,99 @@
+{{- if and .Values.collector.enabled (empty .Values.collector.stations) -}}
+{{- fail "collector.stations must select 1 to 5 station IDs" -}}
+{{- end -}}
+{{- if and .Values.trmnl.enabled (or (not .Values.collector.enabled) (empty .Values.trmnl.existingSecret)) -}}
+{{- fail "TRMNL requires collector.enabled and trmnl.existingSecret" -}}
+{{- end -}}
+{{- if and .Values.collector.enabled .Values.networkPolicy.enabled (not .Values.networkPolicy.allowPublicHTTPS) -}}
+{{- fail "collection requires explicit networkPolicy.allowPublicHTTPS opt-in" -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "berlin-transit.name" . }}
+  labels:
+    {{- include "berlin-transit.selector" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "berlin-transit.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "berlin-transit.selector" . | nindent 8 }}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 15
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: berlin-transit
+          image: {{ include "berlin-transit.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: [serve]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: BERLIN_TRANSIT_LISTEN_ADDR
+              value: "0.0.0.0:8080"
+            - name: BERLIN_TRANSIT_ALLOW_CONTAINER_LISTEN
+              value: "true"
+            - name: BERLIN_TRANSIT_METRICS_ENABLED
+              value: "false"
+            - name: BERLIN_TRANSIT_COLLECTOR_ENABLED
+              value: {{ .Values.collector.enabled | quote }}
+            - name: BERLIN_TRANSIT_COLLECTOR_STATIONS
+              value: {{ join "," .Values.collector.stations | quote }}
+            - name: BERLIN_TRANSIT_COLLECTOR_INTERVAL
+              value: {{ .Values.collector.interval | quote }}
+            - name: BERLIN_TRANSIT_COLLECTOR_LIMIT
+              value: {{ .Values.collector.limit | quote }}
+            - name: TRMNL_ENABLED
+              value: {{ .Values.trmnl.enabled | quote }}
+            {{- if .Values.trmnl.enabled }}
+            - name: TRMNL_INTERVAL
+              value: {{ .Values.trmnl.interval | quote }}
+            - name: TRMNL_MAX_DEPARTURES
+              value: {{ .Values.trmnl.maxDepartures | quote }}
+            - name: TRMNL_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.trmnl.existingSecret | quote }}
+                  key: {{ .Values.trmnl.webhookKey | quote }}
+            {{- end }}
+          startupProbe:
+            exec:
+              command: [/ko-app/berlin-transit, healthcheck]
+            periodSeconds: 2
+            timeoutSeconds: 3
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command: [/ko-app/berlin-transit, healthcheck]
+            periodSeconds: 15
+            timeoutSeconds: 3
+          livenessProbe:
+            exec:
+              command: [/ko-app/berlin-transit, healthcheck]
+            periodSeconds: 30
+            timeoutSeconds: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
