@@ -17,7 +17,8 @@ Versions checked against official sources on 2026-10-23:
 | Helm | 4.3.1 | [Release](https://github.com/helm/helm/releases/tag/v4.3.1) |
 
 CI uses the upstream GoReleaser action and Azure's Helm setup action, pinned to
-reviewed commit SHAs and explicit tool versions. There is no repository-managed
+reviewed commit SHAs. GoReleaser always selects `latest`; the table records the
+version verified on the date above. Helm uses an explicit tool version. There is no repository-managed
 tool installer. For local work, install tools on PATH through their official
 [GoReleaser](https://goreleaser.com/install/), [ko](https://ko.build/install/)
 and [Helm](https://helm.sh/docs/intro/install/) instructions or your existing tool

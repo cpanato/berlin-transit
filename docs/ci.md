@@ -28,7 +28,7 @@ catalog, and local tools are resolved from PATH (Make variables can override).
 | Artifacts | actions/upload-artifact | v7.0.2 | [Release](https://github.com/actions/upload-artifact/releases/tag/v7.0.2) |
 | Go lint | golangci/golangci-lint-action | v9.3.0 / tool v2.15 | [Release](https://github.com/golangci/golangci-lint-action/releases/tag/v9.3.0) |
 | Vulnerabilities | golang/govulncheck-action | v1.1.0 | [Release](https://github.com/golang/govulncheck-action/releases/tag/v1.1.0) |
-| Snapshots | goreleaser/goreleaser-action | v7.3.0 / tool v2.19.0 | [Release](https://github.com/goreleaser/goreleaser-action/releases/tag/v7.3.0) |
+| Snapshots | goreleaser/goreleaser-action | v7.3.0 / tool latest | [Release](https://github.com/goreleaser/goreleaser-action/releases/tag/v7.3.0) |
 | Helm | azure/setup-helm | v5.0.1 / tool v4.3.1 | [Release](https://github.com/Azure/setup-helm/releases/tag/v5.0.1) |
 | Static security | gosec via tools module | v2.29.0 | [Release](https://github.com/securego/gosec/releases/tag/v2.29.0) |
 

@@ -75,13 +75,13 @@ jobs:
       - name: Check GoReleaser configuration
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
-          version: v2.19.0
+          version: latest
           args: check
 
       - name: Build local binary and ko image snapshots
         uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
-          version: v2.19.0
+          version: latest
           args: release --snapshot --clean --skip=publish,sign
 
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
