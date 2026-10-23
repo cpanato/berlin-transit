@@ -97,3 +97,80 @@ jobs:
         with:
           version: v2.15
           skip-cache: true
+
+  packaging:
+    name: Snapshot, Helm, container and SBOM
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          check-latest: true
+          cache: false
+
+      - name: Check GoReleaser configuration
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          version: latest
+          args: check
+
+      - name: Build local binary and ko image snapshots
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          version: latest
+          args: release --snapshot --clean --skip=publish,sign
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.1
+
+      - name: Validate and package Helm without installing
+        run: make helm-check helm-package
+
+      - name: Validate private Compose policy without starting services
+        run: make compose-check
+
+      - name: Reuse the local ko snapshot image
+        run: docker tag ko.local:snapshot berlin-transit:ci
+
+      - name: Verify container defaults and restricted execution
+        run: |
+          test "$(docker image inspect --format '{{.Config.User}}' berlin-transit:ci)" = '65532:65532'
+          test "$(docker image inspect --format '{{json .Config.ExposedPorts}}' berlin-transit:ci)" = 'null'
+          # No network or published ports; a configuration error verifies startup.
+          set +e
+          output=$(docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --memory 64m --cpus 1 --pids-limit 32 \
+            -e BERLIN_TRANSIT_HTTP_TIMEOUT=invalid berlin-transit:ci 2>&1)
+          status=$?
+          set -e
+          test "$status" -eq 1
+          test "$output" = 'invalid BERLIN_TRANSIT_HTTP_TIMEOUT'
+          # Exercise the native probe with no service/network/port publication.
+          set +e
+          output=$(docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --memory 64m --cpus 1 --pids-limit 32 \
+            -e BERLIN_TRANSIT_LISTEN_ADDR=0.0.0.0:8080 \
+            -e BERLIN_TRANSIT_ALLOW_CONTAINER_LISTEN=true \
+            berlin-transit:ci healthcheck 2>&1)
+          status=$?
+          set -e
+          test "$status" -eq 1
+          test "$output" = 'service not ready'
+
+      - name: Retain ko SPDX SBOMs in this workflow run
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: container-sbom
+          path: dist/sbom/
+          retention-days: 7
+          if-no-files-found: error

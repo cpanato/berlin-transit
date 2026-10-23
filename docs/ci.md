@@ -6,6 +6,10 @@ at 06:23 UTC. Jobs use read-only repository permissions, disabled checkout
 credentials, timeouts and redundant-run cancellation. They perform no live VBB
 or TRMNL queries, registry pushes or deployments.
 
+`ci.yml` owns tests, lint and packaging: GoReleaser/ko snapshots, Helm/Compose
+validation, restricted container checks and SBOM retention. `security.yml` owns
+govulncheck and gosec, including the weekly scheduled analysis.
+
 CI checks formatting, vet, unit/integration tests, race tests, fuzzing, module
 integrity/tidiness. Coverage is reported through Go's native
 coverage profile and retained as an artifact, with no custom percentage gate.
