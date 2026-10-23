@@ -5,20 +5,11 @@ The packaging follows the local snapshot pattern reviewed in
 and tests it; no workflow creates tags, GitHub releases, registry pushes or
 Kubernetes deployments. There is no publishing workflow or write permission.
 
-## Verified toolchain
-
-Versions checked against official sources on 2026-10-23:
-
-| Tool | Version | Official source |
-| --- | --- | --- |
-| Go | 1.27.3 | [Download feed](https://go.dev/dl/?mode=json) |
-| GoReleaser | 2.19.0 | [Release](https://github.com/goreleaser/goreleaser/releases/tag/v2.19.0) |
-| ko | 0.19.1 | [Release](https://github.com/ko-build/ko/releases/tag/v0.19.1) |
-| Helm | 4.3.1 | [Release](https://github.com/helm/helm/releases/tag/v4.3.1) |
+## Local tools
 
 CI uses the upstream GoReleaser action and Azure's Helm setup action, pinned to
-reviewed commit SHAs. GoReleaser always selects `latest`; the table records the
-version verified on the date above. Helm uses an explicit tool version. There is no repository-managed
+reviewed commit SHAs. GoReleaser always selects `latest`; other tool selections
+are defined in the [workflows](../.github/workflows/). There is no repository-managed
 tool installer. For local work, install tools on PATH through their official
 [GoReleaser](https://goreleaser.com/install/), [ko](https://ko.build/install/)
 and [Helm](https://helm.sh/docs/intro/install/) instructions or your existing tool
@@ -55,7 +46,7 @@ explicit choice to use a floating base tag. This is an exception to the design's
 digest-pinning default: rebuilding the same commit can resolve a different base.
 Keep both configurations synchronized when changing the selected base.
 `org.opencontainers.image.created` records build time in UTC; standalone targets
-accept an explicit `BUILD_DATE` for reproducibility. GoReleaser also generates a
+accept an explicit `BUILD_DATE` for reproducibility. GoReleaser also generates
 local SPDX image SBOMs under `dist/sbom/`, retained as CI artifacts.
 
 ko images use entrypoint **`/ko-app/berlin-transit`**. The Helm chart targets these

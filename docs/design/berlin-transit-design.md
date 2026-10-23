@@ -1,6 +1,6 @@
 # berlin-transit — Technical Design Document
 
-Status: Proposed | Version: 0.2 | Date: 2026-10-18
+Status: Design reference
 
 ## 1. Summary
 
@@ -108,7 +108,7 @@ Reject invalid configuration at startup. Restrict configurable upstream URL: def
 ## 9. Security requirements
 
 - Use Go standard library by default; introduce dependencies only with documented rationale.
-- Go 1.27.2 is the latest confirmed patched stable release as of 2026-10-18; check official Go release feed again at implementation time and use latest patched stable. Set go.mod/toolchain accordingly and avoid unsupported future version guesses.
+- Use the latest patched stable Go release, verified against the official Go release feed. Keep go.mod/toolchain current; documentation should reference those files rather than duplicate tool versions.
 - Validate and cap all inputs; `net/http` read header, read, write, idle timeouts; cap upstream body size; avoid redirect and DNS rebinding pitfalls.
 - Secure container: multi-stage build, minimal runtime image pinned by digest, non-root UID, read-only root filesystem, no added Linux capabilities, seccomp default, no privilege escalation, resource limits, drop unnecessary network permissions.
 - Never add debug/pprof listener or metrics public by default.
@@ -197,7 +197,7 @@ Required checks:
 10. README includes secure local quick start and clear limitations of the upstream API.
 11. Optional TRMNL push integration is isolated, disabled by default, and never required for the REST API.
 
-Operator updates (2026-10-23): prefer maintained upstream Actions over custom
+Operator choices: prefer maintained upstream Actions over custom
 tool installers; use Go or Bash for repository tooling; use native GitHub secret
 scanning/push protection without a duplicate scanner; omit container scanning.
 The ko base intentionally follows `cgr.dev/chainguard/static:latest` without a

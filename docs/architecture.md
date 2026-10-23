@@ -1,4 +1,4 @@
-# Architecture and verification
+# Architecture
 
 The CLI consumes a small provider interface. `internal/domain` contains only
 provider-independent data; `internal/provider/vbb` owns transport, upstream DTOs,
@@ -8,15 +8,12 @@ needed. The service layer consumes a two-method provider interface. Retrieval
 results carry cache policy/validators separately in `internal/provider`, keeping
 HTTP-specific metadata out of domain models. The original CLI output is preserved.
 
-## Verified upstream contract (2026-10-18)
+## Upstream contract
 
-Official sources: [Go release feed](https://go.dev/dl/?mode=json),
-[VBB API documentation](https://v6.vbb.transport.rest/api.html).
-Go 1.27.2 was the latest stable patch and installed toolchain at M1 verification.
-The runtime uses only the standard library; separate CI tools and their official
-sources are documented in [ci.md](ci.md). The Go release feed and VBB documentation
-were rechecked on 2026-10-19; Go 1.27.2 was still current then. The private
-Compose follow-up below upgrades to verified Go 1.27.3 on 2026-10-20.
+See the [VBB API documentation](https://v6.vbb.transport.rest/api.html) for the
+provider contract. The runtime uses only the standard library; [go.mod](../go.mod)
+defines its minimum toolchain. Separate CI tools and checks are described in
+[ci.md](ci.md), with tool selections in the workflows and tools module.
 
 Conservative live GET checks revealed an incompatibility in the proposed design:
 `/stations?query=Alexanderplatz&limit=1` returned an object of IFOPT station IDs
@@ -39,12 +36,11 @@ errors. No raw upstream body or query URL enters service errors or logs.
 ## Repository reference
 
 The exact reference URL is provided in section 18 of the design:
-https://github.com/cpanato/pr-inbox . Its current Makefile and SECURITY.md were
-read on 2026-10-18. M1 follows its simple `cmd/<binary>` layout, local `dist/`
+https://github.com/cpanato/pr-inbox . Its Makefile, SECURITY.md and workflows
+informed the simple `cmd/<binary>` layout, local `dist/`
 build target, standard Go test target and private vulnerability reporting
-guidance. Before adding the requested CI, its current `ci.yaml`, `zizmor.yaml`
-and `release.yaml` workflows were also reviewed on 2026-10-18. CI follows its
-pinned Actions, disabled checkout credentials and cross-build matrix. Frontend
+guidance. CI follows its pinned Actions, disabled checkout credentials and
+cross-platform builds. Frontend
 and release automation are inapplicable; no release workflow is copied.
 
 ## Verification scope
@@ -54,14 +50,10 @@ production construction accepts only the allowlisted origin. DNS validation is
 tested separately without resolving or dialing external hosts. No unsafe
 upstream override is exposed in the CLI or production constructor.
 
-M1 verification passed on Go 1.27.2: formatting, `go vet ./...`,
-`go test -coverprofile=coverage.out ./...`, `go test -race ./...`, `go mod tidy`,
-and `go build -trimpath`. Statement coverage is 87.4% for the VBB client and
-89.8% for the command package (100% for collection/configuration paths; `main`
-is not invoked in unit tests). Both validation and departure JSON fuzz targets
-passed five-second runs. The built CLI also successfully performed one live
-search and one single-result departures request using the restricted production
-transport. These live checks are manual, separate from the offline test suite.
+CI covers formatting, vet, unit/integration tests, race detection, fuzzing,
+module tidiness, coverage reporting and builds. Coverage results belong in CI
+artifacts rather than a documentation snapshot. Optional live CLI checks use
+the restricted production transport and remain separate from the offline suite.
 
 ## M2 service
 
@@ -118,8 +110,7 @@ shared options/defaults, mixed successes/errors, freshness preservation,
 all-failed statuses, retry metadata, cancellation and panic sanitization. An
 offline HTTP-to-service-to-mock-VBB test verifies shared single/batch cache use,
 result-affecting keys and rate-budget enforcement. The existing race, coverage,
-lint and security checks apply. Go 1.27.2 was reverified against the official
-release feed on 2026-10-19; existing verified tool pins remain unchanged.
+lint and security checks apply.
 Optional deployment examples are deferred. No services are exposed publicly,
 and no image publication, release or deployment is introduced.
 
@@ -158,9 +149,8 @@ HTTP routes, provider interfaces or collector configuration.
 The four private-plugin Liquid layouts and import settings live under
 `integrations/trmnl`; `make trmnl-package` creates a local-only flat ZIP. The
 [adapter guide](../integrations/trmnl/README.md) documents the payload, explicit
-outbound consent, virtual-device preview and live operator smoke test. Official
-TRMNL webhook, private-plugin, template and import docs and Go 1.27.2 were
-rechecked on 2026-10-19. No new Go dependencies or CI tools are introduced.
+outbound consent, virtual-device preview and live operator smoke test. The
+adapter requires no additional Go dependencies or CI tools.
 
 ## Private Compose operations (deferred M4)
 
@@ -184,6 +174,6 @@ or metrics settings through that file. The policy check uses a temporary copy
 of the example and never reads operator secrets. CI validates configuration and
 builds images but never starts Compose. Runtime/port-forwarding validation and
 live health transitions remain operator smoke tests; no deployment was performed.
-Go 1.27.3, the official builder digest, Docker Engine 29.8.2 and Compose 5.6.0 were
-verified on 2026-10-20. Historical M1–M5 verification notes above retain the
-versions used at those milestones. No Go dependencies are added.
+Toolchain and builder selections live in the module files and Dockerfile.
+See [deployment requirements](deployment.md#requirements-and-network-boundary)
+for the minimum Docker/Compose capabilities needed by this setup.

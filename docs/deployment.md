@@ -8,8 +8,9 @@ release workflow, public listener, remote-access configuration or K3s deployment
 ## Requirements and network boundary
 
 Use a trusted local Docker host with **Engine 28.0.0 or newer**, a maintained
-patched release, and **Compose 2.30.0 or newer** (raw env-file support). The example
-was validated with Engine 29.8.2 / Compose 5.6.0 on 2026-10-20. Verify with:
+patched release, and **Compose 2.30.0 or newer** (raw env-file support). These
+minimums are required for loopback isolation and raw environment parsing. Check
+your installed tools with:
 
 ```sh
 docker version
@@ -17,8 +18,8 @@ docker compose version
 ```
 
 Docker's [port-publishing documentation](https://docs.docker.com/engine/network/port-publishing/)
-explains loopback publication and the localhost/L2 isolation issue before
-Engine 28. The example explicitly maps **127.0.0.1:8080 → container:8080** on a
+explains loopback publication and the localhost/L2 isolation issue in older
+Engine releases. The example explicitly maps **127.0.0.1:8080 → container:8080** on a
 standard IPv4 NAT bridge. It enables no host networking, IPv6 publication,
 external network, routed gateway, reverse proxy or public DNS. Keep Docker's
 normal firewall/NAT controls enabled; do not enable custom direct routing or
@@ -88,7 +89,7 @@ parser. It creates no Docker resources and never reads your `.env`. Its assertio
 cover publication, security restrictions, healthcheck, resource bounds, restart,
 logging, network posture and disabled example workers.
 
-The image uses the official Go 1.27.3 builder pinned by immutable digest and a
+The image uses the official Go builder pinned by immutable digest in [Dockerfile](../Dockerfile) and a
 scratch runtime with bundled CA certificates/timezone data. It runs UID/GID
 65532:65532, has no shell/curl and declares no EXPOSE. Compose adds a read-only
 root filesystem, all capabilities dropped, no-new-privileges, 1 CPU, 128 MiB
@@ -164,7 +165,7 @@ commands do not erase a screen already rendered on TRMNL; judge it by its visibl
 collection timestamp. Deployment, LAN/VPN access, K3s, registries and releases
 require separate operator decisions and are not configured here.
 
-Official references checked on 2026-10-20:
+Official references:
 [Compose services](https://docs.docker.com/reference/compose-file/services/),
 [port publishing](https://docs.docker.com/engine/network/port-publishing/),
 [Go releases](https://go.dev/dl/?mode=json),

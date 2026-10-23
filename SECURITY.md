@@ -33,8 +33,9 @@ IPv4 wildcard only inside its isolated bridge network. Host publication stays
 fixed to 127.0.0.1:8080; loopback defaults and HTTP Host/Origin checks remain in
 place. The opt-in flag is not a LAN/public-access control and cannot make a host
 wildcard safe on its own. Keep the example on a trusted local Docker host with
-standard NAT/firewall rules and Engine 28+; no reverse proxy or remote access is
-configured. The health probe is loopback-only and never fetches upstream data.
+standard NAT/firewall rules and the [documented Docker requirements](docs/deployment.md#requirements-and-network-boundary);
+no reverse proxy or remote access is configured. The health probe is loopback-only
+and never fetches upstream data.
 Local `.env` files are ignored by Git and excluded from the allowlisted Docker
 build context. Keep file mode 600 and restrict access to Docker administration,
 which can inspect container environment variables. Do not share resolved
@@ -45,7 +46,7 @@ uses exec probes, disables service-account token mounting and enables ingress an
 egress NetworkPolicy. Policy enforcement depends on the CNI; public HTTPS egress
 requires an explicit values opt-in. The API Host allowlist remains in effect.
 Webhooks reference existing Secrets, never plaintext chart values. Packaging uses
-local-only GoReleaser/ko snapshots, pinned tools and no publishing
+local-only GoReleaser/ko snapshots, reviewed upstream actions and no publishing
 workflow. See [chart limitations](charts/berlin-transit/README.md).
 
 The operator explicitly chose the floating Chainguard `static:latest` base for

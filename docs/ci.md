@@ -55,7 +55,8 @@ directory and calls `docker compose config --format json`. Go assertions verify
 loopback publication, safe environment overrides, raw literal handling, restricted
 container settings, bounded resources/logs, healthcheck and disabled workers. The
 check never reads an operator `.env`, starts a container or needs a running Docker
-daemon. Compose 2.30+ is needed for raw environment parsing.
+daemon. See [deployment requirements](deployment.md#requirements-and-network-boundary)
+for the Compose features this example requires.
 
 Helm lint and Go render tests cover positive/negative fixtures, network boundaries,
 existing Secret references, disabled workers and rejected public service options.
