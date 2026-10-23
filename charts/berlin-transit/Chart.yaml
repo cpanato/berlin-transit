@@ -1,0 +1,10 @@
+apiVersion: v2
+name: berlin-transit
+description: Private VBB departures API with optional collection and TRMNL delivery
+type: application
+version: 0.1.0
+appVersion: "unreleased"
+kubeVersion: ">=1.30.0-0"
+home: https://github.com/cpanato/berlin-transit
+sources:
+  - https://github.com/cpanato/berlin-transit

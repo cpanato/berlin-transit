@@ -31,3 +31,31 @@ check: vet test race
 trmnl-package:
 	mkdir -p dist
 	zip -j -FS dist/berlin-transit-trmnl.zip integrations/trmnl/settings.yml integrations/trmnl/full.liquid integrations/trmnl/half_horizontal.liquid integrations/trmnl/half_vertical.liquid integrations/trmnl/quadrant.liquid
+
+GORELEASER ?= .tools/bin/goreleaser
+KO ?= .tools/bin/ko
+HELM ?= .tools/bin/helm
+PLATFORM ?= linux/$(shell go env GOARCH)
+BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+
+.PHONY: release-check release-snapshot image image-multiarch helm-check helm-package
+release-check:
+	$(GORELEASER) check
+
+release-snapshot: release-check
+	$(GORELEASER) release --snapshot --clean --skip=publish,sign
+
+image:
+	KO_DOCKER_REPO=ko.local/berlin-transit $(KO) build --bare --platform $(PLATFORM) --tags local --image-user=65532:65532 --image-label "org.opencontainers.image.created=$(BUILD_DATE)" ./cmd/berlin-transit
+
+image-multiarch:
+	mkdir -p dist
+	KO_DOCKER_REPO=example.invalid/berlin-transit $(KO) build --bare --push=false --platform linux/amd64,linux/arm64 --image-user=65532:65532 --image-label "org.opencontainers.image.created=$(BUILD_DATE)" --oci-layout-path dist/oci ./cmd/berlin-transit
+
+helm-check:
+	$(HELM) lint --strict charts/berlin-transit
+	HELM=$(abspath $(HELM)) go test -count=1 ./internal/packaging
+
+helm-package:
+	mkdir -p dist/charts
+	$(HELM) package charts/berlin-transit --destination dist/charts

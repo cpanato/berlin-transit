@@ -39,3 +39,16 @@ Local `.env` files are ignored by Git and excluded from the allowlisted Docker
 build context. Keep file mode 600 and restrict access to Docker administration,
 which can inspect container environment variables. Do not share resolved
 Compose/environment inspection output containing the secret webhook URL.
+
+The optional Helm chart fixes a single restricted replica and ClusterIP service,
+uses exec probes, disables service-account token mounting and enables ingress and
+egress NetworkPolicy. Policy enforcement depends on the CNI; public HTTPS egress
+requires an explicit values opt-in. The API Host allowlist remains in effect.
+Webhooks reference existing Secrets, never plaintext chart values. Packaging uses
+local-only GoReleaser/ko snapshots, pinned tools and no publishing
+workflow. See [chart limitations](charts/berlin-transit/README.md).
+
+The operator explicitly chose the floating Chainguard `static:latest` base for
+ko builds; this overrides the design's image digest pinning default for that
+path. Every snapshot is scanned, but rebuilding a commit may resolve a different
+base. The separate Dockerfile builder retains its digest pin.

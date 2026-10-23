@@ -1,0 +1,36 @@
+# Local image only; no published release is assumed to exist.
+image:
+  repository: ko.local/berlin-transit
+  tag: local
+  digest: ""
+  pullPolicy: Never
+imagePullSecrets: []
+# Fixed ClusterIP/8080, with no Ingress, hostPort, hostNetwork or public service.
+service:
+  enabled: true
+collector:
+  enabled: false
+  stations: []
+  interval: 30s
+  limit: 8
+trmnl:
+  enabled: false
+  interval: 5m
+  maxDepartures: 8
+  existingSecret: ""
+  webhookKey: trmnl-webhook-url
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    cpu: "1"
+    memory: 128Mi
+# Requires a CNI that enforces NetworkPolicy. HTTPS egress remains broader than
+# the application's fixed VBB/TRMNL allowlist; standard policies cannot use FQDNs.
+networkPolicy:
+  enabled: true
+  allowPublicHTTPS: false
+  # Same-namespace client pods must carry this label to access the API.
+  clientLabels:
+    berlin-transit-client: "true"

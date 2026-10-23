@@ -2,14 +2,16 @@ name: Security
 
 on:
   pull_request:
+    branches:
+      - main
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
   schedule:
     - cron: '23 6 * * 1'
 
-permissions:
-  contents: read
+permissions: {}
 
 env:
   GOTOOLCHAIN: local
@@ -28,15 +30,22 @@ jobs:
     name: Vulnerabilities and secrets
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+
+    permissions:
+      contents: read
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           fetch-depth: 0
+
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          go-version: stable
+          check-latest: true
           cache: false
+
       - name: Install pinned scanners
         run: |
           mkdir -p .tools/bin
@@ -44,17 +53,24 @@ jobs:
           go -C tools build -o ../.tools/bin/gosec github.com/securego/gosec/v2/cmd/gosec
           go -C tools mod verify
           sh scripts/install-tool.sh gitleaks
+
       - name: Check reachable vulnerabilities
         run: .tools/bin/govulncheck ./...
+
       - name: Static security analysis
         run: .tools/bin/gosec -exclude-dir=.tools ./...
+
       - name: Scan full Git history for secrets
         run: .tools/bin/gitleaks git --redact --no-banner .
 
   container:
-    name: Container, filesystem, licenses and SBOM
+    name: Snapshot, Helm, container and SBOM
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+
+    permissions:
+      contents: read
+
     env:
       TRIVY_NO_PROGRESS: "true"
       TRIVY_DISABLE_TELEMETRY: "true"
@@ -62,16 +78,38 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          check-latest: true
+          cache: false
+
+      - name: Install pinned packaging tools
+        run: |
+          sh scripts/install-tool.sh goreleaser
+          sh scripts/install-tool.sh helm
+
+      - name: Build local binary and ko image snapshots
+        run: make release-snapshot
+
+      - name: Validate and package Helm without installing
+        run: make helm-check helm-package
+
       - name: Install pinned Trivy
         run: sh scripts/install-tool.sh trivy
+
       - name: Scan source, configuration and dependency licenses
         run: |
           .tools/bin/trivy fs --scanners vuln,misconfig,secret,license --license-full \
             --severity HIGH,CRITICAL --exit-code 1 --skip-dirs .git,.tools,dist .
+
       - name: Validate private Compose policy without starting services
         run: python3 scripts/check-compose.py
-      - name: Build local image only
-        run: docker build --tag berlin-transit:ci .
+
+      - name: Reuse the local ko snapshot image
+        run: docker tag ko.local:snapshot berlin-transit:ci
+
       - name: Verify container defaults and restricted execution
         run: |
           test "$(docker image inspect --format '{{.Config.User}}' berlin-transit:ci)" = '65532:65532'
@@ -98,12 +136,15 @@ jobs:
           set -e
           test "$status" -eq 1
           test "$output" = 'service not ready'
+
       - name: Scan image
         run: .tools/bin/trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 berlin-transit:ci
+
       - name: Generate local SBOM
         run: |
           mkdir -p artifacts
           .tools/bin/trivy image --format cyclonedx --output artifacts/sbom.cdx.json berlin-transit:ci
+
       - name: Retain SBOM in this workflow run
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

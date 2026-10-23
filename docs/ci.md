@@ -1,7 +1,7 @@
 # CI and security checks
 
-`ci.yml` and `security.yml` run for pull requests, pushes to `main` and manual
-dispatch. Security checks also run weekly on Monday at 06:23 UTC. Both use
+`ci.yml` and `security.yml` run for pull requests targeting `main` and pushes to
+`main`. Security checks also support manual dispatch and run weekly on Monday at 06:23 UTC. Both use
 read-only repository access, disabled checkout credentials, job timeouts,
 redundant-run cancellation, no secrets and no telemetry export. They execute
 no live VBB or TRMNL queries. Dependency/tool downloads and vulnerability database reads
@@ -43,7 +43,7 @@ Git references API. Go 1.27.2 was rechecked against the
 | gosec | v2.29.0 | [release](https://github.com/securego/gosec/releases/tag/v2.29.0) |
 | golang.org/x/tools | v0.52.0 | [tag](https://github.com/golang/tools/tree/v0.52.0) |
 | gRPC (scanner dependency) | v1.84.0 | [release](https://github.com/grpc/grpc-go/releases/tag/v1.84.0) |
-| Trivy | v0.76.0 | [release](https://github.com/aquasecurity/trivy/releases/tag/v0.76.0) |
+| Trivy | v0.76.1 | [release](https://github.com/aquasecurity/trivy/releases/tag/v0.76.1) |
 | Gitleaks | v8.30.1 | [release](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1) |
 
 `scripts/install-tool.sh` supports Linux/amd64 CI and macOS/arm64 local checks.
@@ -54,6 +54,9 @@ Go compatibility and checksums, update both files, then rerun the checks.
 Dependabot proposes grouped weekly updates for Actions, both Go modules and the
 Docker base. No automatic merging is configured. Release archive tool pins
 must be reviewed and updated manually.
+
+Packaging tools and Trivy were rechecked on 2026-10-23; current GoReleaser,
+ko and Helm pins are recorded in [packaging policy](releases.md).
 
 The collector module still has no external runtime dependencies. `tools/` is a
 separate development-only module with its own lockfile. It builds gosec and
@@ -89,7 +92,7 @@ go -C tools build -o ../.tools/bin/govulncheck golang.org/x/vuln/cmd/govulncheck
 
 ## Container build validation
 
-The Dockerfile builds from the official `golang:1.27.3-bookworm` image pinned to
+The optional Compose Dockerfile builds from the official `golang:1.27.3-bookworm` image pinned to
 the manifest digest verified with `docker buildx imagetools inspect`. The runtime
 uses Docker's built-in empty `scratch` filesystem, carrying only the static CLI
 and CA trust bundle, and runs as UID/GID 65532. Timezone data is embedded in Go.
@@ -102,7 +105,8 @@ memory/CPU/PID limits. It intentionally supplies invalid configuration and
 verifies the expected startup error, so no upstream request occurs. Image
 metadata is checked for the non-root user and absence of exposed ports.
 Runtime restrictions belong in `docker run` or the deployment runtime and cannot
-be enforced by a Dockerfile alone. No container is deployed or kept running.
+be enforced by an image alone. CI exercises the ko snapshot image described below;
+the Dockerfile remains an alternative local Compose build. No container is deployed or kept running.
 
 The container job also runs `python3 scripts/check-compose.py`, using only a
 copy of `.env.example` in a temporary directory. It resolves Compose and checks
@@ -113,3 +117,13 @@ Compose, publishes a port or sends to VBB/TRMNL. Python uses only its standard
 library. Installed Docker Engine 29.8.2 and Compose 5.6.0 were checked against
 official Docker release notes on 2026-10-20. Go 1.27.3 and the builder image's
 immutable digest were verified from the official Go feed and Docker Hub tag API.
+
+## Local packaging checks
+
+The security/container job installs checksum-pinned GoReleaser and Helm. One
+GoReleaser snapshot replaces the separate binary build matrix, covers all six
+Linux/macOS/Windows amd64/arm64 targets and builds both Linux ko variants. It
+reuses the daemon-local snapshot for network-disabled container checks and Trivy.
+The chart is linted, rendered against positive/negative Go policy fixtures and
+packaged locally. CI never runs Helm install, creates a cluster, creates a GitHub
+release or pushes a registry image. See [packaging](releases.md).

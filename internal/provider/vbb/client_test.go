@@ -12,9 +12,9 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/cpanato/berlin-transit/internal/domain"
-	"unicode/utf8"
 )
 
 var fixedNow = time.Date(2026, 10, 18, 16, 30, 0, 0, time.UTC)

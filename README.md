@@ -162,3 +162,12 @@ python3 scripts/check-compose.py
 
 Go 1.27.3 and its pinned official builder image were verified on 2026-10-20.
 CI validates/builds only; it never starts this Compose service or publishes images.
+
+## Local snapshots and optional Helm chart
+
+GoReleaser with ko builds local binaries and Linux amd64/arm64 image snapshots.
+The optional Helm chart uses ClusterIP, restricted pods and a default egress
+policy; collection and TRMNL require explicit opt-in. CI renders and tests the
+chart without installing it. See [packaging and release policy](docs/releases.md)
+and the [Helm chart guide](charts/berlin-transit/README.md) for setup and limits.
+No image, chart or release is published automatically.

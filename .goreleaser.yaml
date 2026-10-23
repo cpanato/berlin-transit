@@ -1,0 +1,42 @@
+version: 2
+project_name: berlin-transit
+builds:
+  - id: binary
+    main: ./cmd/berlin-transit
+    binary: berlin-transit
+    env: [CGO_ENABLED=0]
+    flags: [-trimpath]
+    ldflags: [-s -w]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+kos:
+  - id: container
+    build: binary
+    main: ./cmd/berlin-transit
+    base_image: cgr.dev/chainguard/static:latest
+    user: '65532:65532'
+    repositories: [ko.local/berlin-transit]
+    local_domain: ko.local
+    platforms: [linux/amd64, linux/arm64]
+    tags: [snapshot]
+    bare: true
+    sbom: spdx
+    labels:
+      org.opencontainers.image.created: '{{ .Date }}'
+      org.opencontainers.image.source: https://github.com/cpanato/berlin-transit
+      org.opencontainers.image.licenses: Apache-2.0
+archives:
+  - ids: [binary]
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files: [LICENSE, README.md]
+checksum:
+  name_template: checksums.txt
+snapshot:
+  version_template: '0.0.0-{{ .ShortCommit }}'
+changelog:
+  disable: true
+release:
+  disable: true

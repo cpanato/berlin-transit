@@ -169,3 +169,12 @@ Official references checked on 2026-10-20:
 [port publishing](https://docs.docker.com/engine/network/port-publishing/),
 [Go releases](https://go.dev/dl/?mode=json),
 [official builder tag](https://hub.docker.com/_/golang).
+
+## Optional Kubernetes packaging
+
+The [Helm chart](../charts/berlin-transit/README.md) provides private ClusterIP
+manifests with restricted pods, local exec probes and NetworkPolicy. It supports
+ko image entrypoints; the Dockerfile/Compose entrypoint differs. Render/package
+with `make helm-check helm-package`; no installation is performed. Review the
+chart guide's Host, DNS/CNI, secret and egress requirements before an explicitly
+authorized deployment.
