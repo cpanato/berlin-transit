@@ -15,10 +15,12 @@ kos:
     main: ./cmd/berlin-transit
     base_image: cgr.dev/chainguard/static:latest
     user: '65532:65532'
-    repositories: [ko.local/berlin-transit]
+    repositories: [ghcr.io/cpanato/berlin-transit]
     local_domain: ko.local
     platforms: [linux/amd64, linux/arm64]
-    tags: [snapshot]
+    tags:
+      - '{{ if .IsSnapshot }}snapshot{{ else }}{{ .Tag }}{{ end }}'
+      - '{{ if and (not .IsSnapshot) (not .Prerelease) }}latest{{ end }}'
     bare: true
     sbom: spdx
     sbom_directory: dist/sbom
@@ -35,9 +37,36 @@ archives:
     files: [LICENSE, README.md]
 checksum:
   name_template: checksums.txt
+binary_signs:
+  - cmd: cosign
+    ids: [binary]
+    signature: '${artifact}_{{ .Os }}_{{ .Arch }}.sigstore.json'
+    args:
+      - sign-blob
+      - '--bundle=${signature}'
+      - '${artifact}'
+      - --yes
+signs:
+  - cmd: cosign
+    artifacts: checksum
+    signature: '${artifact}.sigstore.json'
+    args:
+      - sign-blob
+      - '--bundle=${signature}'
+      - '${artifact}'
+      - --yes
+docker_signs:
+  - artifacts: manifests
+    args:
+      - sign
+      - '${artifact}@${digest}'
+      - --yes
 snapshot:
   version_template: '0.0.0-{{ .ShortCommit }}'
 changelog:
-  disable: true
+  use: github-native
 release:
-  disable: true
+  github:
+    owner: cpanato
+    name: berlin-transit
+  prerelease: auto

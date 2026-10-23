@@ -2,8 +2,11 @@
 
 The packaging follows the local snapshot pattern reviewed in
 [cpanato/tado-bridge](https://github.com/cpanato/tado-bridge). Merging code builds
-and tests it; no workflow creates tags, GitHub releases, registry pushes or
-Kubernetes deployments. There is no publishing workflow or write permission.
+and tests local snapshots without publishing. The separate
+[release workflow](../.github/workflows/release.yml) can publish an explicitly
+approved GitHub release and GHCR image, sign them and record build provenance.
+It is manual-only; a merge or tag push does not trigger publication. Deployment
+and Helm chart publication remain outside this workflow.
 
 ## Local tools
 
@@ -27,7 +30,7 @@ make helm-check helm-package
 
 GoReleaser builds Linux/macOS/Windows amd64/arm64 binaries, archives and checksums
 under ignored `dist/`. Windows archives use ZIP; other platforms use tar.gz.
-`release.disable: true` and `--snapshot --skip=publish,sign` keep releases disabled.
+`--snapshot --skip=publish,sign` keeps ordinary builds unsigned and unpublished.
 Its built-in [ko integration](https://goreleaser.com/customization/package/ko/)
 builds both Linux image variants and imports **`ko.local:snapshot`** into the local
 Docker daemon. Daemon import selects a platform variant; CI exercises amd64.
@@ -64,9 +67,93 @@ behavior still require operator acceptance in an explicitly authorized environme
 `release-snapshot --clean` removes previous `dist/` outputs; package Helm and TRMNL
 after the snapshot if you want all local artifacts together.
 
-## Future publishing
+## Signing and build provenance
 
-A Git tag, release, image/chart publication or deployment requires a separate
-explicit instruction naming the action and target. Before adding that path,
-review the version, intended commit, destination, signing/provenance, SBOM and
-passing checks. No registry location or released image is assumed by the chart.
+The release job uses cosign with GitHub OIDC, following the signing configuration
+reviewed in [tado-bridge](https://github.com/cpanato/tado-bridge). There is no stored
+signing key. The cosign installer uses its upstream defaults; GoReleaser uses
+`latest`. Tool/action selections live in the workflow, not a second version list.
+
+GoReleaser signs application binaries before archiving and signs `checksums.txt`,
+publishing Sigstore verification bundles with the release assets. Archive hashes
+are covered by that signed checksum list. The multi-platform image is signed at
+the immutable digest produced by ko, with its signature stored in GHCR. Stable
+releases receive the exact tag and `latest`; prereleases do not update `latest`.
+Snapshots keep using only the local daemon through `local_domain: ko.local`.
+
+The official GitHub attestation action adds signed SLSA build provenance for
+archives, raw binaries, checksums, SBOM files and the image digest. The image digest
+comes from GoReleaser's build metadata, rather than resolving a mutable registry
+tag. Artifact and image provenance bundles are attached to the release; image
+provenance is also stored in GHCR. A signature establishes integrity and signer
+identity; build provenance additionally records the workflow and source commit.
+This workflow makes no claim of a higher SLSA assurance level.
+
+Ordinary CI has no OIDC, registry-write or attestation-write permission. It skips
+signing/publishing and tests release guards, image tag selection and digest
+extraction with local fixtures. Real OIDC signing, attestation publication and
+registry verification require an authorized release; snapshot tests do not prove
+those external operations have succeeded.
+
+See the official [cosign integration](https://goreleaser.com/customization/sign/sign/#signing-with-cosign)
+and [GitHub build provenance documentation](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations).
+
+## Authorize a release
+
+A tag, release, image/chart publication or deployment requires a separate explicit
+instruction naming the intended action and target. This implementation creates
+none of them and does not configure the repository's release environment.
+
+Before a future release, configure a GitHub environment named `release` with
+required reviewers and allow the main branch. The preflight fails if reviewer
+protection is missing. Only the publication job receives write/OIDC permissions,
+after preflight and environment approval. CI/security checks must pass for the
+chosen commit before an operator creates and pushes the authorized SemVer tag.
+
+Dispatch `release.yml` from `main`, supplying that existing tag and explicitly
+checking `publish`. The tag must point to the workflow's exact main commit; the
+check runs before and after approval. This keeps the built source aligned with
+the commit recorded by GitHub provenance. If main advances, select the intended
+current commit and tag rather than releasing an older tag with unrelated source
+metadata. The workflow never creates or moves tags.
+
+The configured destinations are this repository's GitHub releases and
+`ghcr.io/cpanato/berlin-transit`. Signing/attestation records publish signer,
+artifact digest and build metadata to Sigstore/GitHub/GHCR. Re-running a partial
+release can update release assets or image tags; review its state before retrying.
+The chart still defaults to a local image and assumes no published release exists.
+
+## Verify downloaded artifacts
+
+Use the expected commit from your approved release, not a value supplied only by
+the downloaded artifact. The signing identity references `main` because release
+runs through manual dispatch from that branch:
+
+```sh
+repo=cpanato/berlin-transit
+commit='<approved-commit-sha>'
+identity="https://github.com/$repo/.github/workflows/release.yml@refs/heads/main"
+issuer=https://token.actions.githubusercontent.com
+
+cosign verify-blob --bundle checksums.txt.sigstore.json \
+  --certificate-identity "$identity" --certificate-oidc-issuer "$issuer" \
+  checksums.txt
+# With GNU coreutils, check the archives you downloaded against the signed list.
+sha256sum --check --ignore-missing checksums.txt
+
+gh attestation verify '<downloaded-archive>' --repo "$repo" \
+  --signer-workflow "$repo/.github/workflows/release.yml" \
+  --source-ref refs/heads/main --source-digest "$commit"
+
+image=ghcr.io/cpanato/berlin-transit
+digest='sha256:<published-manifest-digest>'
+cosign verify --certificate-identity "$identity" \
+  --certificate-oidc-issuer "$issuer" "$image@$digest"
+gh attestation verify "oci://$image@$digest" --repo "$repo" \
+  --signer-workflow "$repo/.github/workflows/release.yml" \
+  --source-ref refs/heads/main --source-digest "$commit"
+```
+
+Extracted binaries can also be verified with their corresponding binary Sigstore
+bundle using `cosign verify-blob`. Git commit signing remains separate: gitsign's
+certificate identity does not change the Git author/committer metadata.
