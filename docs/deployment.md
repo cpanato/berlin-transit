@@ -76,14 +76,14 @@ From the repository root:
 
 ```sh
 # Safe CI-style policy validation: reads only .env.example in a temporary copy.
-python3 scripts/check-compose.py
+make compose-check
 # Validate your real configuration without printing its values.
 docker compose config --quiet
 # Build the local-only image; does not start containers or publish it.
 docker compose build
 ```
 
-The policy check uses Python's standard library plus the installed Compose
+The policy check uses Go's standard library plus the installed Compose
 parser. It creates no Docker resources and never reads your `.env`. Its assertions
 cover publication, security restrictions, healthcheck, resource bounds, restart,
 logging, network posture and disabled example workers.

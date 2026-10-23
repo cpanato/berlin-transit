@@ -50,5 +50,6 @@ workflow. See [chart limitations](charts/berlin-transit/README.md).
 
 The operator explicitly chose the floating Chainguard `static:latest` base for
 ko builds; this overrides the design's image digest pinning default for that
-path. Every snapshot is scanned, but rebuilding a commit may resolve a different
-base. The separate Dockerfile builder retains its digest pin.
+path. Rebuilding a commit may resolve a different base. The separate Dockerfile
+builder retains its digest pin. Secret scanning and push protection use GitHub's
+native repository features; Go vulnerability/static analysis run in CI.

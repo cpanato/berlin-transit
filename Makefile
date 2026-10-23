@@ -19,7 +19,6 @@ race:
 coverage:
 	go test -coverprofile=coverage.out ./...
 	go tool cover -func=coverage.out
-	awk -f scripts/check-coverage.awk coverage.out
 
 tidy:
 	go mod tidy
@@ -32,9 +31,9 @@ trmnl-package:
 	mkdir -p dist
 	zip -j -FS dist/berlin-transit-trmnl.zip integrations/trmnl/settings.yml integrations/trmnl/full.liquid integrations/trmnl/half_horizontal.liquid integrations/trmnl/half_vertical.liquid integrations/trmnl/quadrant.liquid
 
-GORELEASER ?= .tools/bin/goreleaser
-KO ?= .tools/bin/ko
-HELM ?= .tools/bin/helm
+GORELEASER ?= goreleaser
+KO ?= ko
+HELM ?= helm
 PLATFORM ?= linux/$(shell go env GOARCH)
 BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
@@ -54,8 +53,12 @@ image-multiarch:
 
 helm-check:
 	$(HELM) lint --strict charts/berlin-transit
-	HELM=$(abspath $(HELM)) go test -count=1 ./internal/packaging
+	HELM=$(abspath $(shell command -v $(HELM))) go test -count=1 -run '^TestChart$$' ./internal/packaging
 
 helm-package:
 	mkdir -p dist/charts
 	$(HELM) package charts/berlin-transit --destination dist/charts
+
+.PHONY: compose-check
+compose-check:
+	COMPOSE_CHECK=1 go test -count=1 -run '^TestCompose$$' ./internal/packaging

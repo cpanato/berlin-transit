@@ -15,20 +15,14 @@ Versions checked against official sources on 2026-10-23:
 | GoReleaser | 2.19.0 | [Release](https://github.com/goreleaser/goreleaser/releases/tag/v2.19.0) |
 | ko | 0.19.1 | [Release](https://github.com/ko-build/ko/releases/tag/v0.19.1) |
 | Helm | 4.3.1 | [Release](https://github.com/helm/helm/releases/tag/v4.3.1) |
-| Trivy | 0.76.1 | [Release](https://github.com/aquasecurity/trivy/releases/tag/v0.76.1) |
 
-Install the reviewed binaries into ignored `.tools/bin/`:
-
-```sh
-sh scripts/install-tool.sh goreleaser
-sh scripts/install-tool.sh ko
-sh scripts/install-tool.sh helm
-```
-
-The installer verifies committed SHA-256 values from official release assets
-before extracting a single executable. It supports Linux amd64 and macOS arm64.
-No build tool is added to the runtime Go module. Review versions and checksums
-explicitly when upgrading; do not replace pins with `latest` downloads.
+CI uses the upstream GoReleaser action and Azure's Helm setup action, pinned to
+reviewed commit SHAs and explicit tool versions. There is no repository-managed
+tool installer. For local work, install tools on PATH through their official
+[GoReleaser](https://goreleaser.com/install/), [ko](https://ko.build/install/)
+and [Helm](https://helm.sh/docs/intro/install/) instructions or your existing tool
+manager. Make variables `GORELEASER`, `KO` and `HELM` accept executable overrides.
+No build tool is added to the runtime Go module.
 
 ## Snapshots and images
 
@@ -58,10 +52,10 @@ trim paths and run as 65532:65532. Both `.ko.yaml` and `.goreleaser.yaml` use
 `cgr.dev/chainguard/static:latest` with CA certificates, following the operator's
 explicit choice to use a floating base tag. This is an exception to the design's
 digest-pinning default: rebuilding the same commit can resolve a different base.
-Keep both configurations synchronized and scan the resulting image on every build.
+Keep both configurations synchronized when changing the selected base.
 `org.opencontainers.image.created` records build time in UTC; standalone targets
 accept an explicit `BUILD_DATE` for reproducibility. GoReleaser also generates a
-local SPDX image SBOM; Trivy retains its CycloneDX report as a CI artifact.
+local SPDX image SBOMs under `dist/sbom/`, retained as CI artifacts.
 
 ko images use entrypoint **`/ko-app/berlin-transit`**. The Helm chart targets these
 images. The existing Dockerfile/Compose path remains a separate local option with
@@ -69,7 +63,7 @@ entrypoint `/berlin-transit`; its Compose healthcheck must not be used unchanged
 with a ko image. See [Compose operations](deployment.md).
 
 CI uses one GoReleaser snapshot for all six binary targets and both Linux image
-variants, then scans and exercises the daemon-local image with networking disabled.
+variants, then verifies and exercises the daemon-local image with networking disabled.
 The Helm checks render manifests, verify security/secret/egress policies and package
 locally; they do not install a chart or access a cluster. No credentials are needed
 for these tests. Actual installation, CNI enforcement, scheduling and arm64 runtime

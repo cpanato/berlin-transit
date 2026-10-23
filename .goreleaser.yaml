@@ -21,6 +21,7 @@ kos:
     tags: [snapshot]
     bare: true
     sbom: spdx
+    sbom_directory: dist/sbom
     labels:
       org.opencontainers.image.created: '{{ .Date }}'
       org.opencontainers.image.source: https://github.com/cpanato/berlin-transit

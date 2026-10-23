@@ -60,13 +60,8 @@ jobs:
           git diff --exit-code -- tools/go.mod tools/go.sum
           test -z "$(git ls-files --others --exclude-standard -- tools/go.mod tools/go.sum)"
 
-      - name: Install pinned linters
-        run: |
-          sh scripts/install-tool.sh actionlint
-
-      - name: Lint Go and workflows
-        run: |
-          .tools/bin/actionlint
+      - name: Lint workflows
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
       - name: Fuzz bounded inputs and upstream JSON
         run: |

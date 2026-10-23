@@ -157,7 +157,7 @@ until you enable them. Restart policy applies only after you start the service.
 Validate the example without starting anything or reading a local `.env`:
 
 ```sh
-python3 scripts/check-compose.py
+make compose-check
 ```
 
 Go 1.27.3 and its pinned official builder image were verified on 2026-10-20.

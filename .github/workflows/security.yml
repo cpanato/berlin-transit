@@ -27,53 +27,40 @@ defaults:
 
 jobs:
   source:
-    name: Vulnerabilities and secrets
+    name: Go security analysis
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-
     permissions:
       contents: read
-
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          fetch-depth: 0
-
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: stable
-          check-latest: true
-          cache: false
-
-      - name: Install pinned scanners
-        run: |
-          mkdir -p .tools/bin
-          go -C tools build -o ../.tools/bin/govulncheck golang.org/x/vuln/cmd/govulncheck
-          go -C tools build -o ../.tools/bin/gosec github.com/securego/gosec/v2/cmd/gosec
-          go -C tools mod verify
-          sh scripts/install-tool.sh gitleaks
 
       - name: Check reachable vulnerabilities
-        run: .tools/bin/govulncheck ./...
+        uses: golang/govulncheck-action@032d45514ae346b1db93c04b0c90b841c370344f # v1.1.0
+        with:
+          repo-checkout: false
+          go-version-input: stable
+          cache: false
+          check-latest: true
+          go-package: ./...
 
-      - name: Static security analysis
-        run: .tools/bin/gosec -exclude-dir=.tools ./...
-
-      - name: Scan full Git history for secrets
-        run: .tools/bin/gitleaks git --redact --no-banner .
+      # The upstream gosec action image cannot read Go 1.27 export data.
+      # Keep the reviewed compatible importer in the isolated tools module.
+      - name: Build and run compatible gosec
+        run: |
+          mkdir -p .tools/bin
+          go -C tools build -o ../.tools/bin/gosec github.com/securego/gosec/v2/cmd/gosec
+          go -C tools mod verify
+          .tools/bin/gosec -exclude-dir=.tools ./...
 
   container:
     name: Snapshot, Helm, container and SBOM
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-
     permissions:
       contents: read
-
-    env:
-      TRIVY_NO_PROGRESS: "true"
-      TRIVY_DISABLE_TELEMETRY: "true"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -85,27 +72,27 @@ jobs:
           check-latest: true
           cache: false
 
-      - name: Install pinned packaging tools
-        run: |
-          sh scripts/install-tool.sh goreleaser
-          sh scripts/install-tool.sh helm
+      - name: Check GoReleaser configuration
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          version: v2.19.0
+          args: check
 
       - name: Build local binary and ko image snapshots
-        run: make release-snapshot
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          version: v2.19.0
+          args: release --snapshot --clean --skip=publish,sign
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.1
 
       - name: Validate and package Helm without installing
         run: make helm-check helm-package
 
-      - name: Install pinned Trivy
-        run: sh scripts/install-tool.sh trivy
-
-      - name: Scan source, configuration and dependency licenses
-        run: |
-          .tools/bin/trivy fs --scanners vuln,misconfig,secret,license --license-full \
-            --severity HIGH,CRITICAL --exit-code 1 --skip-dirs .git,.tools,dist .
-
       - name: Validate private Compose policy without starting services
-        run: python3 scripts/check-compose.py
+        run: make compose-check
 
       - name: Reuse the local ko snapshot image
         run: docker tag ko.local:snapshot berlin-transit:ci
@@ -137,18 +124,10 @@ jobs:
           test "$status" -eq 1
           test "$output" = 'service not ready'
 
-      - name: Scan image
-        run: .tools/bin/trivy image --scanners vuln --severity HIGH,CRITICAL --exit-code 1 berlin-transit:ci
-
-      - name: Generate local SBOM
-        run: |
-          mkdir -p artifacts
-          .tools/bin/trivy image --format cyclonedx --output artifacts/sbom.cdx.json berlin-transit:ci
-
-      - name: Retain SBOM in this workflow run
+      - name: Retain ko SPDX SBOMs in this workflow run
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: container-sbom
-          path: artifacts/sbom.cdx.json
+          path: dist/sbom/
           retention-days: 7
           if-no-files-found: error

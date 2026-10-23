@@ -1,129 +1,93 @@
 # CI and security checks
 
 `ci.yml` and `security.yml` run for pull requests targeting `main` and pushes to
-`main`. Security checks also support manual dispatch and run weekly on Monday at 06:23 UTC. Both use
-read-only repository access, disabled checkout credentials, job timeouts,
-redundant-run cancellation, no secrets and no telemetry export. They execute
-no live VBB or TRMNL queries. Dependency/tool downloads and vulnerability database reads
-require outbound HTTPS; source analysis happens on the runner.
+`main`. Security checks also support manual dispatch and run weekly on Monday
+at 06:23 UTC. Jobs use read-only repository permissions, disabled checkout
+credentials, timeouts and redundant-run cancellation. They perform no live VBB
+or TRMNL queries, registry pushes or deployments.
 
-CI checks formatting, vet, tests, race tests, fuzzing, module integrity/tidiness,
-golangci-lint configuration and analysis, and actionlint. Core executable
-packages under `internal/` must each reach 80% statement coverage, including
-shared domain validation. The CLI is
-measured but excluded from that gate because `main` exits the process. Cross
-builds cover Linux, macOS and Windows on amd64 and arm64 with CGO disabled.
-Fuzz targets exercise domain input validation, upstream JSON and HTTP query parsing.
-CI also builds the flat private-plugin import ZIP with `make trmnl-package`; this
-bundle is only local to the runner and is not uploaded or sent to TRMNL.
+CI checks formatting, vet, unit/integration tests, race tests, fuzzing, module
+integrity/tidiness and workflow syntax. Coverage is reported through Go's native
+coverage profile and retained as an artifact, with no custom percentage gate.
+Helm/Compose policy tests use
+Go and the external tools' own parsers, with no YAML dependency in the runtime.
+The flat TRMNL import ZIP is built locally but never sent to TRMNL.
 
-Security checks run govulncheck, gosec, Gitleaks over full Git history, and
-Trivy filesystem vulnerability, misconfiguration, secret and license checks.
-Trivy blocks HIGH/CRITICAL findings, including vulnerabilities without fixes;
-there are no blanket scan exclusions or ignored scanner failures. It also
-scans the local image and generates a CycloneDX SBOM. Coverage and SBOM are
-retained as workflow artifacts for seven days, with no registry uploads,
-release creation, deployments or public services. There is no release workflow.
+## Maintained actions and tools
 
-## Verified versions and sources
+Prefer upstream actions over repository-managed installers. Actions are pinned
+to immutable full commit SHAs, verified against their official tag APIs on
+2026-10-23. Dependabot proposes weekly Actions/module/Docker updates; it does
+not merge automatically. There is no custom tool-download script or checksum
+catalog, and local tools are resolved from PATH (Make variables can override).
 
-Versions were checked against the official release/tag APIs on 2026-10-18.
-Actions tags were resolved to immutable commit SHAs through each repository's
-Git references API. Go 1.27.2 was rechecked against the
-[official Go feed](https://go.dev/dl/?mode=json).
+| Purpose | Action / tool | Version | Official source |
+| --- | --- | --- | --- |
+| Checkout | actions/checkout | v7.0.1 | [Release](https://github.com/actions/checkout/releases/tag/v7.0.1) |
+| Go | actions/setup-go | v7.0.0 | [Release](https://github.com/actions/setup-go/releases/tag/v7.0.0) |
+| Artifacts | actions/upload-artifact | v7.0.2 | [Release](https://github.com/actions/upload-artifact/releases/tag/v7.0.2) |
+| Go lint | golangci/golangci-lint-action | v9.3.0 / tool v2.15 | [Release](https://github.com/golangci/golangci-lint-action/releases/tag/v9.3.0) |
+| Vulnerabilities | golang/govulncheck-action | v1.1.0 | [Release](https://github.com/golang/govulncheck-action/releases/tag/v1.1.0) |
+| Snapshots | goreleaser/goreleaser-action | v7.3.0 / tool v2.19.0 | [Release](https://github.com/goreleaser/goreleaser-action/releases/tag/v7.3.0) |
+| Helm | azure/setup-helm | v5.0.1 / tool v4.3.1 | [Release](https://github.com/Azure/setup-helm/releases/tag/v5.0.1) |
+| Workflow lint | actionlint via `go run` | v1.7.12 | [Release](https://github.com/rhysd/actionlint/releases/tag/v1.7.12) |
+| Static security | gosec via tools module | v2.29.0 | [Release](https://github.com/securego/gosec/releases/tag/v2.29.0) |
 
-| Component | Version | Official source |
-| --- | --- | --- |
-| checkout | v7.0.1 | [release](https://github.com/actions/checkout/releases/tag/v7.0.1) |
-| setup-go | v7.0.0 | [release](https://github.com/actions/setup-go/releases/tag/v7.0.0) |
-| upload-artifact | v7.0.2 | [release](https://github.com/actions/upload-artifact/releases/tag/v7.0.2) |
-| golangci-lint | v2.15.0 | [release](https://github.com/golangci/golangci-lint/releases/tag/v2.15.0) |
-| actionlint | v1.7.12 | [release](https://github.com/rhysd/actionlint/releases/tag/v1.7.12) |
-| govulncheck | v1.1.4 | [release](https://github.com/golang/vuln/releases/tag/v1.1.4) |
-| gosec | v2.29.0 | [release](https://github.com/securego/gosec/releases/tag/v2.29.0) |
-| golang.org/x/tools | v0.52.0 | [tag](https://github.com/golang/tools/tree/v0.52.0) |
-| gRPC (scanner dependency) | v1.84.0 | [release](https://github.com/grpc/grpc-go/releases/tag/v1.84.0) |
-| Trivy | v0.76.1 | [release](https://github.com/aquasecurity/trivy/releases/tag/v0.76.1) |
-| Gitleaks | v8.30.1 | [release](https://github.com/gitleaks/gitleaks/releases/tag/v8.30.1) |
+The official govulncheck action installs its current tool release and scans
+`./...`; checkout is explicitly disabled inside it to preserve the existing
+credential-free checkout. Go is selected through the stable channel with latest
+patch checks and caching disabled. Workflow lint has no upstream action in the
+selected actionlint release, so it runs as a versioned Go command instead.
 
-`scripts/install-tool.sh` supports Linux/amd64 CI and macOS/arm64 local checks.
-It downloads the selected official release archive and verifies a SHA256 pinned
-in `scripts/tool-checksums.txt`, copied from the official release checksums. Only
-the named executable is extracted. For updates, compare official release notes,
-Go compatibility and checksums, update both files, then rerun the checks.
-Dependabot proposes grouped weekly updates for Actions, both Go modules and the
-Docker base. No automatic merging is configured. Release archive tool pins
-must be reviewed and updated manually.
+The upstream gosec action/container does not support Go 1.27 export data. We
+build gosec with the compatible, reviewed `golang.org/x/tools` v0.52.0 importer
+in the separate `tools/` module. Its transitive gRPC remains pinned to v1.84.0
+to address CVE-2026-84445. That module has its own lockfile and uses the Go public
+checksum database; the application module has no external runtime dependencies.
 
-Packaging tools and Trivy were rechecked on 2026-10-23; current GoReleaser,
-ko and Helm pins are recorded in [packaging policy](releases.md).
+Secret scanning and push protection are provided by the repository's native
+GitHub settings (both confirmed enabled). The zizmor workflow separately reviews
+Actions security. No duplicate secret scanner or container scanner is configured.
 
-The collector module still has no external runtime dependencies. `tools/` is a
-separate development-only module with its own lockfile. It builds gosec and
-govulncheck with Go 1.27.2. The official gosec v2.29.0 archive and its unchanged
-source dependencies fail to read Go 1.27 export data (version 5). The isolated
-module explicitly pins the official stable `golang.org/x/tools` v0.52.0 to
-provide the compatible importer, without changing collector dependencies or
-ignoring scanner errors. Go module downloads use the public checksum database.
-The tools module also upgrades transitive gRPC to the verified stable v1.84.0:
-Trivy detected CVE-2026-84445 in the scanner's original v1.83.1 dependency.
-The update fixes that finding without suppressing it.
+## Reproduce locally
 
-To reproduce the source checks locally:
+Install Go, golangci-lint, GoReleaser, ko and Helm through their official
+installation instructions or your existing tool manager. Then run:
 
 ```sh
-make check
-make coverage
+make check coverage
+make helm-check helm-package compose-check
 go mod verify
 go -C tools mod verify
-sh scripts/install-tool.sh golangci-lint
-sh scripts/install-tool.sh actionlint
-sh scripts/install-tool.sh gitleaks
+golangci-lint config verify
+golangci-lint run
+go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 mkdir -p .tools/bin
 go -C tools build -o ../.tools/bin/gosec github.com/securego/gosec/v2/cmd/gosec
 go -C tools build -o ../.tools/bin/govulncheck golang.org/x/vuln/cmd/govulncheck
-.tools/bin/golangci-lint config verify
-.tools/bin/golangci-lint run
-.tools/bin/actionlint
 .tools/bin/gosec ./...
 .tools/bin/govulncheck ./...
-.tools/bin/gitleaks git --redact --no-banner .
 ```
 
-## Container build validation
+## Packaging checks
 
-The optional Compose Dockerfile builds from the official `golang:1.27.3-bookworm` image pinned to
-the manifest digest verified with `docker buildx imagetools inspect`. The runtime
-uses Docker's built-in empty `scratch` filesystem, carrying only the static CLI
-and CA trust bundle, and runs as UID/GID 65532. Timezone data is embedded in Go.
-There are no exposed ports or shell. The Docker context allows only module and
-collector source files, excluding Git metadata, tools, tests and local artifacts.
+One GoReleaser snapshot covers Linux/macOS/Windows amd64/arm64 archives and both
+Linux ko image variants. CI reuses the daemon-local snapshot for metadata and
+network-disabled execution checks, verifies the non-root UID, absence of exposed
+ports and expected sanitized errors. Restrictions include a read-only filesystem,
+dropped capabilities, no-new-privileges and memory/CPU/PID limits. ko generates
+SPDX SBOMs under `dist/sbom/`, retained as workflow artifacts for seven days,
+alongside the separate coverage artifact. No release workflow is configured.
 
-CI tests execution with `--network none --read-only --cap-drop ALL`,
-`--security-opt no-new-privileges:true`, Docker's default seccomp profile and
-memory/CPU/PID limits. It intentionally supplies invalid configuration and
-verifies the expected startup error, so no upstream request occurs. Image
-metadata is checked for the non-root user and absence of exposed ports.
-Runtime restrictions belong in `docker run` or the deployment runtime and cannot
-be enforced by an image alone. CI exercises the ko snapshot image described below;
-the Dockerfile remains an alternative local Compose build. No container is deployed or kept running.
+`make compose-check` copies only `compose.yaml` and `.env.example` into a temporary
+directory and calls `docker compose config --format json`. Go assertions verify
+loopback publication, safe environment overrides, raw literal handling, restricted
+container settings, bounded resources/logs, healthcheck and disabled workers. The
+check never reads an operator `.env`, starts a container or needs a running Docker
+daemon. Compose 2.30+ is needed for raw environment parsing.
 
-The container job also runs `python3 scripts/check-compose.py`, using only a
-copy of `.env.example` in a temporary directory. It resolves Compose and checks
-loopback-only publication, Host-related environment overrides, disabled workers,
-non-root/read-only/capability restrictions, health command, bounded resources,
-NAT bridge settings and local logging. It never reads an operator `.env`, starts
-Compose, publishes a port or sends to VBB/TRMNL. Python uses only its standard
-library. Installed Docker Engine 29.8.2 and Compose 5.6.0 were checked against
-official Docker release notes on 2026-10-20. Go 1.27.3 and the builder image's
-immutable digest were verified from the official Go feed and Docker Hub tag API.
-
-## Local packaging checks
-
-The security/container job installs checksum-pinned GoReleaser and Helm. One
-GoReleaser snapshot replaces the separate binary build matrix, covers all six
-Linux/macOS/Windows amd64/arm64 targets and builds both Linux ko variants. It
-reuses the daemon-local snapshot for network-disabled container checks and Trivy.
-The chart is linted, rendered against positive/negative Go policy fixtures and
-packaged locally. CI never runs Helm install, creates a cluster, creates a GitHub
-release or pushes a registry image. See [packaging](releases.md).
+Helm lint and Go render tests cover positive/negative fixtures, network boundaries,
+existing Secret references, disabled workers and rejected public service options.
+The chart is packaged locally and never installed by CI. The separate Dockerfile
+remains an optional Compose path with a digest-pinned Go builder and scratch
+runtime. See [packaging policy](releases.md) and [deployment](deployment.md).
