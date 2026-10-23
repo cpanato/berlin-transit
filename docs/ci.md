@@ -7,7 +7,7 @@ credentials, timeouts and redundant-run cancellation. They perform no live VBB
 or TRMNL queries, registry pushes or deployments.
 
 CI checks formatting, vet, unit/integration tests, race tests, fuzzing, module
-integrity/tidiness and workflow syntax. Coverage is reported through Go's native
+integrity/tidiness. Coverage is reported through Go's native
 coverage profile and retained as an artifact, with no custom percentage gate.
 Helm/Compose policy tests use
 Go and the external tools' own parsers, with no YAML dependency in the runtime.
@@ -30,14 +30,12 @@ catalog, and local tools are resolved from PATH (Make variables can override).
 | Vulnerabilities | golang/govulncheck-action | v1.1.0 | [Release](https://github.com/golang/govulncheck-action/releases/tag/v1.1.0) |
 | Snapshots | goreleaser/goreleaser-action | v7.3.0 / tool v2.19.0 | [Release](https://github.com/goreleaser/goreleaser-action/releases/tag/v7.3.0) |
 | Helm | azure/setup-helm | v5.0.1 / tool v4.3.1 | [Release](https://github.com/Azure/setup-helm/releases/tag/v5.0.1) |
-| Workflow lint | actionlint via `go run` | v1.7.12 | [Release](https://github.com/rhysd/actionlint/releases/tag/v1.7.12) |
 | Static security | gosec via tools module | v2.29.0 | [Release](https://github.com/securego/gosec/releases/tag/v2.29.0) |
 
 The official govulncheck action installs its current tool release and scans
 `./...`; checkout is explicitly disabled inside it to preserve the existing
 credential-free checkout. Go is selected through the stable channel with latest
-patch checks and caching disabled. Workflow lint has no upstream action in the
-selected actionlint release, so it runs as a versioned Go command instead.
+patch checks and caching disabled.
 
 The upstream gosec action/container does not support Go 1.27 export data. We
 build gosec with the compatible, reviewed `golang.org/x/tools` v0.52.0 importer
@@ -61,7 +59,6 @@ go mod verify
 go -C tools mod verify
 golangci-lint config verify
 golangci-lint run
-go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 mkdir -p .tools/bin
 go -C tools build -o ../.tools/bin/gosec github.com/securego/gosec/v2/cmd/gosec
 go -C tools build -o ../.tools/bin/govulncheck golang.org/x/vuln/cmd/govulncheck

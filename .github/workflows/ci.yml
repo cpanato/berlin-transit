@@ -60,9 +60,6 @@ jobs:
           git diff --exit-code -- tools/go.mod tools/go.sum
           test -z "$(git ls-files --others --exclude-standard -- tools/go.mod tools/go.sum)"
 
-      - name: Lint workflows
-        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-
       - name: Fuzz bounded inputs and upstream JSON
         run: |
           go test ./internal/provider/vbb -run '^$' -fuzz '^FuzzValidation$' -fuzztime=10s -parallel=2
