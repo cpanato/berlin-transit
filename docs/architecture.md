@@ -41,7 +41,7 @@ informed the simple `cmd/<binary>` layout, local `dist/`
 build target, standard Go test target and private vulnerability reporting
 guidance. CI follows its pinned Actions, disabled checkout credentials and
 cross-platform builds. Frontend tooling is outside this project. The separate
-manual signing/provenance path follows the reviewed tado-bridge configuration;
+signing/provenance path follows the reviewed tado-bridge configuration;
 see [release policy](releases.md).
 
 ## Verification scope

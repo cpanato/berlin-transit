@@ -130,7 +130,7 @@ berlin-transit/
   internal/observability/
   .github/workflows/ci.yml
   .github/workflows/security.yml
-  .github/workflows/release.yml   # manual dispatch only, optional in later milestone
+  .github/workflows/release.yml   # operator-pushed version tags; manual fallback
   .github/dependabot.yml
   docs/architecture.md
   docs/api.md
@@ -163,7 +163,7 @@ Required checks:
 - dependency analysis and native GitHub secret scanning / push protection
 - Dependabot for gomod, github-actions, and docker, weekly grouped PRs, no automatic merge.
 
-**Release policy:** no automatic tags, GitHub releases, artifact publication to external registries, GHCR pushes, deployments, or changelog publishing. If release workflow is added, make it workflow_dispatch-only, with explicit confirmation inputs and environment approvals, least-privilege permissions and optional provenance/SBOM. Build/test on push is allowed; publishing is not. Avoid CI job token `packages: write` except an explicitly approved release job.
+**Release policy:** ordinary branch/PR CI never publishes. An operator-pushed `v*` tag authorizes the separate release workflow to publish the GitHub release, GHCR image, signatures and provenance without an extra approval. Manual dispatch remains available with explicit confirmation. Validate tag/source identity and main ancestry; use least-privilege permissions. The workflow never creates tags or deploys services. Restrict publication permissions to the release job.
 
 ## 12. Testing strategy
 
