@@ -51,33 +51,39 @@ func releaseWorkflow(t *testing.T) workflow {
 	return w
 }
 
-func TestManualReleaseBoundary(t *testing.T) {
+func TestReleaseBoundary(t *testing.T) {
 	w := releaseWorkflow(t)
-	if len(w.On) != 1 || w.On["workflow_dispatch"] == nil {
-		t.Fatal("release must only run by explicit manual dispatch")
+	if len(w.On) != 2 || w.On["workflow_dispatch"] == nil {
+		t.Fatal("release must run only on version tags or explicit manual dispatch")
+	}
+	push, ok := w.On["push"].(map[string]any)
+	if !ok || len(push) != 1 || !reflect.DeepEqual(push["tags"], []any{"v*"}) {
+		t.Fatal("automatic releases must trigger only on v* tags")
 	}
 	if len(w.Permissions) != 0 {
 		t.Fatal("workflow-wide permissions must remain empty")
 	}
 	validate := w.Jobs["validate"]
-	if validate.If != "github.repository == 'cpanato/berlin-transit' && github.ref == 'refs/heads/main' && inputs.publish" {
-		t.Fatal("missing repository, main and confirmation guards")
+	condition := strings.Join(strings.Fields(validate.If), " ")
+	want := "github.repository == 'cpanato/berlin-transit' && ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish))"
+	if condition != want {
+		t.Fatal("missing repository, version-tag or manual-confirmation guards")
 	}
-	if !reflect.DeepEqual(validate.Permissions, map[string]string{"contents": "read", "actions": "read"}) {
+	if !reflect.DeepEqual(validate.Permissions, map[string]string{"contents": "read"}) {
 		t.Fatal("validation must not have write permissions")
 	}
 	if len(validate.Steps) != 2 {
 		t.Fatal("unexpected preflight steps")
 	}
 	check := validate.Steps[1].Run
-	for _, guard := range []string{"refs/tags/$RELEASE_TAG^{commit}", "$GITHUB_SHA", "environments/release", "required_reviewers", `test "$reviewers" -gt 0`} {
+	for _, guard := range []string{"refs/tags/$RELEASE_TAG^{commit}", "$GITHUB_SHA", `git merge-base --is-ancestor "$GITHUB_SHA" origin/main`} {
 		if !strings.Contains(check, guard) {
 			t.Errorf("missing authorization guard %q", guard)
 		}
 	}
 	publish := w.Jobs["release"]
-	if publish.Needs != "validate" || publish.Environment != "release" {
-		t.Fatal("publication must wait for validation and protected release environment")
+	if publish.Needs != "validate" || publish.Environment != "" {
+		t.Fatal("publication must wait for validation without an environment approval gate")
 	}
 	if !reflect.DeepEqual(publish.Permissions, map[string]string{"contents": "write", "packages": "write", "id-token": "write", "attestations": "write"}) {
 		t.Fatal("unexpected release permissions")
