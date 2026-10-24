@@ -40,6 +40,7 @@ BUILD_DATE ?= $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 .PHONY: release-check release-snapshot image image-multiarch helm-check helm-package
 release-check:
 	$(GORELEASER) check
+	go -C tools test ./release
 
 release-snapshot: release-check
 	$(GORELEASER) release --snapshot --clean --skip=publish,sign

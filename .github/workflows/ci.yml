@@ -50,6 +50,9 @@ jobs:
       - name: Build local private-plugin import bundle
         run: make trmnl-package
 
+      - name: Check release authorization and signing configuration
+        run: go -C tools test ./release
+
       - name: Verify module integrity and tidy state
         run: |
           go mod verify

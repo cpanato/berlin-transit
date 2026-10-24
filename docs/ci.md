@@ -48,7 +48,8 @@ network-disabled execution checks, verifies the non-root UID, absence of exposed
 ports and expected sanitized errors. Restrictions include a read-only filesystem,
 dropped capabilities, no-new-privileges and memory/CPU/PID limits. ko generates
 SPDX SBOMs under `dist/sbom/`, retained as workflow artifacts for seven days,
-alongside the separate coverage artifact. No release workflow is configured.
+alongside the separate coverage artifact. A [separate manual release workflow](releases.md)
+handles approved signing/publication; ordinary CI never requests a signing identity.
 
 `make compose-check` copies only `compose.yaml` and `.env.example` into a temporary
 directory and calls `docker compose config --format json`. Go assertions verify

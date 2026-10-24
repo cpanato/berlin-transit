@@ -2,8 +2,9 @@
 
 This is an optional, operator-managed deployment. Preparing/building/validating
 these files starts no service. Only run the start commands below when you want
-to run the application. CI never executes them. There is no registry publication,
-release workflow, public listener, remote-access configuration or K3s deployment.
+to run the application. CI never executes them. This setup configures no registry
+publication, public listener, remote access or K3s deployment. The separate
+[manual release workflow](releases.md) does not start this deployment.
 
 ## Requirements and network boundary
 

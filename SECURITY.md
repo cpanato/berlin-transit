@@ -46,11 +46,18 @@ uses exec probes, disables service-account token mounting and enables ingress an
 egress NetworkPolicy. Policy enforcement depends on the CNI; public HTTPS egress
 requires an explicit values opt-in. The API Host allowlist remains in effect.
 Webhooks reference existing Secrets, never plaintext chart values. Packaging uses
-local-only GoReleaser/ko snapshots, reviewed upstream actions and no publishing
-workflow. See [chart limitations](charts/berlin-transit/README.md).
+local-only GoReleaser/ko snapshots in ordinary CI and reviewed upstream actions.
+See [chart limitations](charts/berlin-transit/README.md).
 
 The operator explicitly chose the floating Chainguard `static:latest` base for
 ko builds; this overrides the design's image digest pinning default for that
 path. Rebuilding a commit may resolve a different base. The separate Dockerfile
 builder retains its digest pin. Secret scanning and push protection use GitHub's
 native repository features; Go vulnerability/static analysis run in CI.
+
+The separate manual release workflow requires explicit publication confirmation,
+a tag matching its main commit and a protected release environment with reviewers.
+Only its approved release job receives publication/OIDC permissions. It signs
+binaries, checksums and image manifests with cosign and records GitHub build
+provenance. No key material is stored in the repository. Ordinary CI skips all
+signing and publishing. See [release verification](docs/releases.md#verify-downloaded-artifacts).

@@ -169,3 +169,8 @@ policy; collection and TRMNL require explicit opt-in. CI renders and tests the
 chart without installing it. See [packaging and release policy](docs/releases.md)
 and the [Helm chart guide](charts/berlin-transit/README.md) for setup and limits.
 No image, chart or release is published automatically.
+
+The separate manual release workflow prepares cosign signatures and GitHub build
+provenance for an explicitly authorized release. See [signing, approval and
+verification](docs/releases.md#signing-and-build-provenance) for the release
+environment requirements and commands to verify downloaded artifacts.
