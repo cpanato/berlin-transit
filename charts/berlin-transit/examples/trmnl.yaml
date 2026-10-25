@@ -1,0 +1,11 @@
+# Opt-in: scheduled VBB collection and outbound snapshots to TRMNL.
+networkPolicy:
+  allowPublicHTTPS: true
+collector:
+  enabled: true
+  # S+U Alexanderplatz and S+U Friedrichstrasse (Berlin), respectively.
+  stations: ["900100003", "900100001"]
+trmnl:
+  enabled: true
+  existingSecret: berlin-transit-trmnl
+  webhookKey: trmnl-webhook-url

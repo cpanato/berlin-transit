@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+const releaseImage = "ghcr.io/cpanato/berlin-transit@sha256:0252caed0243176ca087138df2906f44a26e3c352f4397d6c4b86dbab2f6c793"
+
 // These packaging tests use Helm's own YAML decoder and the standard library.
 // They never contact a cluster. Ordinary Go tests do not require Helm installed.
 func TestChart(t *testing.T) {
@@ -180,6 +182,51 @@ func TestChart(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) { render(t, values, false) })
 	}
+	t.Run("release_examples", func(t *testing.T) {
+		base, err := os.ReadFile("../../charts/berlin-transit/examples/release.yaml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		trmnl, err := os.ReadFile("../../charts/berlin-transit/examples/trmnl.yaml")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, enabled := range []bool{false, true} {
+			t.Run(strconv.FormatBool(enabled), func(t *testing.T) {
+				values := string(base)
+				if enabled {
+					values += "\n" + string(trmnl)
+				}
+				objects := render(t, values, true)
+				if len(objects) != 3 {
+					t.Fatal("examples must only render Deployment, Service and NetworkPolicy")
+				}
+				container := lookup(t, objects, "Deployment", "spec", "template", "spec", "containers", "0")
+				equalJSON(t, lookup(t, container, "image"), strconv.Quote(releaseImage))
+				equalJSON(t, lookup(t, container, "imagePullPolicy"), `"IfNotPresent"`)
+				// Image overrides must preserve all pod, service and ingress restrictions.
+				for _, field := range []string{"securityContext", "resources", "ports", "startupProbe", "readinessProbe", "livenessProbe"} {
+					if !reflect.DeepEqual(lookup(t, container, field), lookup(t, c, field)) {
+						t.Errorf("release example changed container %s", field)
+					}
+				}
+				if !reflect.DeepEqual(objects["Service"], defaults["Service"]) || !reflect.DeepEqual(lookup(t, objects, "NetworkPolicy", "spec", "ingress"), lookup(t, policy, "ingress")) {
+					t.Error("release example changed private API access")
+				}
+				exampleEnv := environment(t, container)
+				for _, name := range []string{"TRMNL_ENABLED", "BERLIN_TRANSIT_COLLECTOR_ENABLED"} {
+					equalJSON(t, lookup(t, exampleEnv, name, "value"), strconv.Quote(strconv.FormatBool(enabled)))
+				}
+				if enabled {
+					equalJSON(t, exampleEnv["TRMNL_WEBHOOK_URL"], `{"name":"TRMNL_WEBHOOK_URL","valueFrom":{"secretKeyRef":{"name":"berlin-transit-trmnl","key":"trmnl-webhook-url"}}}`)
+					equalJSON(t, lookup(t, exampleEnv, "BERLIN_TRANSIT_COLLECTOR_STATIONS", "value"), `"900100003,900100001"`)
+					equalJSON(t, lookup(t, objects, "NetworkPolicy", "spec", "egress", "1", "ports"), `[{"port":443,"protocol":"TCP"}]`)
+				} else if exampleEnv["TRMNL_WEBHOOK_URL"] != nil || !reflect.DeepEqual(objects["NetworkPolicy"], defaults["NetworkPolicy"]) {
+					t.Error("release-only example must keep webhook absent and HTTPS egress disabled")
+				}
+			})
+		}
+	})
 }
 
 func lookup(t *testing.T, value any, path ...string) any {

@@ -4,7 +4,7 @@ This is an optional, operator-managed deployment. Preparing/building/validating
 these files starts no service. Only run the start commands below when you want
 to run the application. CI never executes them. This setup configures no registry
 publication, public listener, remote access or K3s deployment. The separate
-[manual release workflow](releases.md) does not start this deployment.
+[release workflow](releases.md) does not start this deployment.
 
 ## Requirements and network boundary
 
@@ -49,14 +49,15 @@ allowlisted build context. Keep permissions at 600 and backups private. It is a
 [raw Compose env_file](https://docs.docker.com/reference/compose-file/services/#env_file):
 use literal `KEY=value`, with no quotes, interpolation or inline comments.
 The example starts with collection and TRMNL both disabled, so startup and
-healthchecks do not query VBB or send to TRMNL. S Buch (S2, ID 900135001) is only
-an example station choice, and can be changed without editing source.
+healthchecks do not query VBB or send to TRMNL. The example selects
+S+U Alexanderplatz (`900100003`) and S+U Friedrichstraße (`900100001`), Berlin.
+Station IDs can be changed without editing source.
 
 To opt in to scheduled VBB collection, set:
 
 ```dotenv
 BERLIN_TRANSIT_COLLECTOR_ENABLED=true
-BERLIN_TRANSIT_COLLECTOR_STATIONS=900135001
+BERLIN_TRANSIT_COLLECTOR_STATIONS=900100003,900100001
 ```
 
 To additionally send cached normalized snapshots to your TRMNL plugin, set
@@ -88,7 +89,8 @@ docker compose build
 The policy check uses Go's standard library plus the installed Compose
 parser. It creates no Docker resources and never reads your `.env`. Its assertions
 cover publication, security restrictions, healthcheck, resource bounds, restart,
-logging, network posture and disabled example workers.
+logging, network posture and disabled example workers for both local-build and
+published-image configurations.
 
 The image uses the official Go builder pinned by immutable digest in [Dockerfile](../Dockerfile) and a
 scratch runtime with bundled CA certificates/timezone data. It runs UID/GID
@@ -98,10 +100,48 @@ memory with no extra swap allowance, 64 PIDs and bounded local logs (3 files,
 5m each).
 There are no host mounts, persistent application volumes or Docker socket.
 
+## Use the published image instead of building
+
+[compose.release.yaml](../compose.release.yaml) overrides the local build with
+the published multi-platform image, pinned to its manifest digest. It removes
+`build` with Compose's documented [reset tag](https://docs.docker.com/reference/compose-file/merge/#reset-value),
+selects `pull_policy: missing` and changes the healthcheck executable to
+`/ko-app/berlin-transit`. The loopback mapping and container restrictions remain
+inherited from `compose.yaml`. Both workers remain disabled in `.env.example`.
+Use the same private `.env` setup and optional collection/TRMNL settings above.
+Compose reads the webhook from `.env`; Kubernetes uses a Secret as described in
+the [chart guide](../charts/berlin-transit/README.md#optional-s-bahn-collection-and-trmnl).
+
+Before pulling, follow [signature and provenance verification](releases.md#verify-downloaded-artifacts)
+for the digest in the override. The initial release uses the `refs/heads/main`
+workflow identity. From the repository root, validation starts no services:
+
+```sh
+make compose-check
+docker compose -f compose.yaml -f compose.release.yaml config --quiet
+```
+
+When you explicitly choose to run this local deployment:
+
+```sh
+docker compose -f compose.yaml -f compose.release.yaml pull
+docker compose -f compose.yaml -f compose.release.yaml up -d --no-build
+docker compose -f compose.yaml -f compose.release.yaml ps
+curl --fail http://127.0.0.1:8080/readyz
+docker compose -f compose.yaml -f compose.release.yaml exec -T berlin-transit /ko-app/berlin-transit healthcheck
+```
+
+Keep **both `-f` options** for subsequent `logs`, `stop`, `down` and update commands.
+To update or roll back, select a verified release digest in `compose.release.yaml`,
+validate, pull and recreate with the same two files. No build is needed. Keep
+the previous digest for rollback; recreating resets the in-memory state. These
+commands download/run an existing image; they do not publish one.
+
 ## Explicitly start and verify
 
 The commands in this section start a local deployment. Run them manually only
 when you choose to operate it; they were not executed as part of preparation.
+This section uses the local Dockerfile image, without the release override.
 Port 8080 must be free: stop an earlier `test-trmnl.sh`/`serve` process first.
 
 ```sh

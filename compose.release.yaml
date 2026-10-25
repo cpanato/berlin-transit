@@ -1,0 +1,9 @@
+# Use with: docker compose -f compose.yaml -f compose.release.yaml ...
+# v0.1.0 multi-platform image; verify signatures/provenance before operating it.
+services:
+  berlin-transit:
+    build: !reset null
+    image: ghcr.io/cpanato/berlin-transit@sha256:0252caed0243176ca087138df2906f44a26e3c352f4397d6c4b86dbab2f6c793
+    pull_policy: missing
+    healthcheck:
+      test: ["CMD", "/ko-app/berlin-transit", "healthcheck"]

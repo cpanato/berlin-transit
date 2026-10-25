@@ -134,10 +134,10 @@ jobs:
         with:
           version: v4.3.1
 
-      - name: Validate and package Helm without installing
+      - name: Validate Helm examples and package without installing
         run: make helm-check helm-package
 
-      - name: Validate private Compose policy without starting services
+      - name: Validate local and release Compose examples without starting services
         run: make compose-check
 
       - name: Reuse the local ko snapshot image

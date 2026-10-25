@@ -1,0 +1,6 @@
+# v0.1.0 multi-platform image; verify signatures/provenance before operating it.
+# Collection/TRMNL remain disabled unless explicitly enabled in another override.
+image:
+  repository: ghcr.io/cpanato/berlin-transit
+  digest: sha256:0252caed0243176ca087138df2906f44a26e3c352f4397d6c4b86dbab2f6c793
+  pullPolicy: IfNotPresent

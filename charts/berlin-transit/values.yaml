@@ -1,4 +1,4 @@
-# Local image only; no published release is assumed to exist.
+# Local image by default; examples/release.yaml selects the published image.
 image:
   repository: ko.local/berlin-transit
   tag: local
