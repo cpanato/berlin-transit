@@ -4,28 +4,17 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing SemVer tag pointing to this main commit
-        type: string
-        required: true
-      publish:
-        description: Publish release, GHCR image, signatures and provenance
-        type: boolean
-        required: true
-        default: false
 
 permissions: {}
 
 concurrency:
-  group: release-${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+  group: release-${{ github.ref_name }}
   cancel-in-progress: false
 
 env:
   GOTOOLCHAIN: local
   GOTELEMETRY: "off"
-  RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+  RELEASE_TAG: ${{ github.ref_name }}
 
 defaults:
   run:
@@ -36,8 +25,7 @@ jobs:
     name: Validate release tag and source
     if: >-
       github.repository == 'cpanato/berlin-transit' &&
-      ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
-       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish))
+      github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

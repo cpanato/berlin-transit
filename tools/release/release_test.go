@@ -53,8 +53,8 @@ func releaseWorkflow(t *testing.T) workflow {
 
 func TestReleaseBoundary(t *testing.T) {
 	w := releaseWorkflow(t)
-	if len(w.On) != 2 || w.On["workflow_dispatch"] == nil {
-		t.Fatal("release must run only on version tags or explicit manual dispatch")
+	if len(w.On) != 1 {
+		t.Fatal("release must run only on version tag pushes")
 	}
 	push, ok := w.On["push"].(map[string]any)
 	if !ok || len(push) != 1 || !reflect.DeepEqual(push["tags"], []any{"v*"}) {
@@ -65,9 +65,9 @@ func TestReleaseBoundary(t *testing.T) {
 	}
 	validate := w.Jobs["validate"]
 	condition := strings.Join(strings.Fields(validate.If), " ")
-	want := "github.repository == 'cpanato/berlin-transit' && ((github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish))"
+	want := "github.repository == 'cpanato/berlin-transit' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')"
 	if condition != want {
-		t.Fatal("missing repository, version-tag or manual-confirmation guards")
+		t.Fatal("missing repository or version-tag push guards")
 	}
 	if !reflect.DeepEqual(validate.Permissions, map[string]string{"contents": "read"}) {
 		t.Fatal("validation must not have write permissions")

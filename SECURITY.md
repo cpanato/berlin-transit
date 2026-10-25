@@ -55,8 +55,8 @@ path. Rebuilding a commit may resolve a different base. The separate Dockerfile
 builder retains its digest pin. Secret scanning and push protection use GitHub's
 native repository features; Go vulnerability/static analysis run in CI.
 
-The release workflow runs for operator-pushed `v*` tags without an approval gate;
-manual dispatch requires explicit publication confirmation. It validates the tag
+The release workflow runs only for operator-pushed `v*` tags without an approval
+gate. It validates the tag
 against the event's source commit and main ancestry. Only its publication job
 receives publication/OIDC permissions. It signs
 binaries, checksums and image manifests with cosign and records GitHub build

@@ -49,7 +49,7 @@ ports and expected sanitized errors. Restrictions include a read-only filesystem
 dropped capabilities, no-new-privileges and memory/CPU/PID limits. ko generates
 SPDX SBOMs under `dist/sbom/`, retained as workflow artifacts for seven days,
 alongside the separate coverage artifact. A [separate release workflow](releases.md)
-handles signing/publication on version tags or explicit manual dispatch;
+handles signing/publication only on version tag pushes;
 ordinary CI never requests a signing identity.
 
 Dependabot version updates have a seven-day cooldown for each configured updater.

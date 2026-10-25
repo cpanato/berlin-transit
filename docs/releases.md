@@ -5,7 +5,7 @@ The packaging follows the local snapshot pattern reviewed in
 and tests local snapshots without publishing. The separate
 [release workflow](../.github/workflows/release.yml) publishes a GitHub release
 and GHCR image, signs them and records build provenance when an operator pushes
-a `v*` version tag. Manual dispatch remains available as a fallback. Merges and
+a `v*` version tag. This is the only release trigger. Merges and
 ordinary branch pushes do not publish. No environment approval is required.
 Deployment and Helm chart publication remain outside this workflow.
 
@@ -107,10 +107,9 @@ without an additional approval. It validates the tag format, requires the tag to
 match the event's source commit and checks that the commit belongs to main.
 Only the publication job receives write/OIDC permissions after validation.
 
-For manual dispatch, select `main`, supply the existing tag and check `publish`.
-The tag must match that dispatch's exact main commit. Both paths build the event's
-immutable SHA so provenance describes the source actually compiled. The workflow
-never creates or moves tags and does not require a GitHub environment.
+The workflow builds the event's immutable SHA so provenance describes the source
+actually compiled. It never creates or moves tags and does not require a GitHub
+environment.
 
 The configured destinations are this repository's GitHub releases and
 `ghcr.io/cpanato/berlin-transit`. Signing/attestation records publish signer,
@@ -121,15 +120,15 @@ The chart still defaults to a local image and assumes no published release exist
 ## Verify downloaded artifacts
 
 Use the expected commit and source ref for the release, not values supplied only
-by the downloaded artifact. Automatic releases use the version tag as their source
-ref; manual releases use `refs/heads/main`:
+by the downloaded artifact. Releases use the version tag as their source ref.
+The initial `v0.1.0` release predates this policy and used `refs/heads/main`:
 
 ```sh
 repo=cpanato/berlin-transit
 commit='<approved-commit-sha>'
 release_tag='<release-tag>'
 source_ref="refs/tags/$release_tag"
-# For a manually dispatched release, use: source_ref=refs/heads/main
+# For the initial v0.1.0 release, use: source_ref=refs/heads/main
 identity="https://github.com/$repo/.github/workflows/release.yml@$source_ref"
 issuer=https://token.actions.githubusercontent.com
 

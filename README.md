@@ -171,6 +171,6 @@ and the [Helm chart guide](charts/berlin-transit/README.md) for setup and limits
 Merges and ordinary branch pushes do not publish images or releases.
 
 Pushing an authorized `v*` tag starts the release workflow, including cosign
-signatures and GitHub build provenance, without an extra approval. Manual
-dispatch remains available. See [signing and verification](docs/releases.md#signing-and-build-provenance)
+signatures and GitHub build provenance, without an extra approval. Releases run
+only on tag pushes. See [signing and verification](docs/releases.md#signing-and-build-provenance)
 for publishing details and commands to verify downloaded artifacts.
