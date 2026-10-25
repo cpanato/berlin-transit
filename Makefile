@@ -54,6 +54,8 @@ image-multiarch:
 
 helm-check:
 	$(HELM) lint --strict charts/berlin-transit
+	$(HELM) lint --strict charts/berlin-transit -f charts/berlin-transit/examples/release.yaml
+	$(HELM) lint --strict charts/berlin-transit -f charts/berlin-transit/examples/release.yaml -f charts/berlin-transit/examples/trmnl.yaml
 	HELM=$(abspath $(shell command -v $(HELM))) go test -count=1 -run '^TestChart$$' ./internal/packaging
 
 helm-package:

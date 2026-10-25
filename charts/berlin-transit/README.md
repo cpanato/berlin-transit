@@ -2,11 +2,38 @@
 
 Optional private Kubernetes packaging; rendering/packaging never installs it.
 Start with `make helm-check helm-package`. Installation requires explicit operator
-authorization and an appropriate private cluster. No released image is assumed.
+authorization and an appropriate private cluster. Defaults use a local image.
 Build with `make image`, then make that image available on the intended nodes, or
 select an operator-provisioned repository/digest and pull policy. Defaults use
 `ko.local/berlin-transit:local` with `Never`. Only ko-built images are supported:
 the executable probe path is `/ko-app/berlin-transit`.
+
+## Published image
+
+The [release values](examples/release.yaml) select the published multi-platform
+image by manifest digest with `IfNotPresent`, while leaving collection, TRMNL and
+public HTTPS egress disabled. Verify the image's
+[signature and provenance](../../docs/releases.md#verify-downloaded-artifacts)
+before operating it. Render locally from the repository root:
+
+```sh
+helm template transit charts/berlin-transit --namespace transit \
+  -f charts/berlin-transit/examples/release.yaml
+```
+
+After explicitly choosing an installation in an existing private namespace:
+
+```sh
+helm upgrade --install transit charts/berlin-transit --namespace transit \
+  -f charts/berlin-transit/examples/release.yaml --wait --timeout 2m
+```
+
+The chart remains local to the checkout; no chart registry is required. CI only
+lints and renders these examples. For updates or rollback, select a verified
+digest in your own values override and run the reviewed upgrade command. Use
+both example files below when enabling TRMNL, including on subsequent upgrades.
+
+## Runtime policy
 
 The chart fixes one replica and `Recreate` strategy to avoid duplicate upstream
 budgets and TRMNL sends during upgrades. Restarts clear cache, rate budget and
@@ -49,23 +76,40 @@ boundary and requires equivalent external controls.
 
 ## Optional S-Bahn collection and TRMNL
 
-An example values override selects S Buch (Berlin); station IDs remain configurable:
+The [TRMNL values](examples/trmnl.yaml) select S+U Alexanderplatz (`900100003`)
+and S+U Friedrichstraße (`900100001`), Berlin. Station IDs remain configurable.
+They enable collection and outbound HTTPS and reference an existing Secret.
+Render together with the release values:
 
-```yaml
-networkPolicy:
-  allowPublicHTTPS: true
-collector:
-  enabled: true
-  stations: ["900135001"]
-trmnl:
-  enabled: true
-  existingSecret: berlin-transit-trmnl
-  webhookKey: trmnl-webhook-url
+```sh
+helm template transit charts/berlin-transit --namespace transit \
+  -f charts/berlin-transit/examples/release.yaml \
+  -f charts/berlin-transit/examples/trmnl.yaml
 ```
 
 Provision the Secret separately using your existing secret-management process;
 never put a real webhook in values, Git, command arguments, rendered fixtures or
 CI artifacts. The chart only references a Secret key; it creates no Secret.
+For a manual installation, an alternative is a private file **outside this
+checkout**, mode 600, containing only the complete webhook URL without quotes
+or a trailing newline.
+Do not put its contents on the command line. In your existing private namespace,
+the following creates a Secret from the file and explicitly starts collection
+and delivery when Helm installs the application:
+
+```sh
+kubectl --namespace transit create secret generic berlin-transit-trmnl \
+  --from-file=trmnl-webhook-url=/private/path/trmnl-webhook-url
+helm upgrade --install transit charts/berlin-transit --namespace transit \
+  -f charts/berlin-transit/examples/release.yaml \
+  -f charts/berlin-transit/examples/trmnl.yaml --wait --timeout 2m
+```
+
+Replace the example file path. The Secret must be in the same namespace as the
+release; existing Secrets should be maintained by their current manager. These
+commands are operator instructions, never run by CI. Kubernetes Secrets require
+appropriate namespace RBAC and cluster encryption-at-rest controls.
+
 Collection requires 1–5 unique IDs; enabling TRMNL also requires collection and
 an existing Secret name. Default intervals are 30s for collection and 5m for
 TRMNL; default maximum departures is 8. Application startup validates duration

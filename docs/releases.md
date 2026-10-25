@@ -115,7 +115,10 @@ The configured destinations are this repository's GitHub releases and
 `ghcr.io/cpanato/berlin-transit`. Signing/attestation records publish signer,
 artifact digest and build metadata to Sigstore/GitHub/GHCR. Re-running a partial
 release can update release assets or image tags; review its state before retrying.
-The chart still defaults to a local image and assumes no published release exists.
+The chart still defaults to a local image. To consume a published release, use
+the [Helm example](../charts/berlin-transit/README.md#published-image) or
+[Compose override](deployment.md#use-the-published-image-instead-of-building),
+both pinned by digest. Changing these examples does not publish or deploy anything.
 
 ## Verify downloaded artifacts
 

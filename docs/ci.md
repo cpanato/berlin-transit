@@ -56,16 +56,22 @@ Dependabot version updates have a seven-day cooldown for each configured updater
 Security updates remain exempt from that delay. The zizmor scan includes
 Dependabot configuration as well as workflows and actions.
 
-`make compose-check` copies only `compose.yaml` and `.env.example` into a temporary
-directory and calls `docker compose config --format json`. Go assertions verify
+`make compose-check` copies only `compose.yaml`, `compose.release.yaml` and
+`.env.example` into a temporary directory and calls
+`docker compose config --format json` for the local-build and release variants.
+Go assertions verify
 loopback publication, safe environment overrides, raw literal handling, restricted
 container settings, bounded resources/logs, healthcheck and disabled workers. The
+release variant must remove the build, select the pinned GHCR digest and use the
+ko healthcheck path. The
 check never reads an operator `.env`, starts a container or needs a running Docker
 daemon. See [deployment requirements](deployment.md#requirements-and-network-boundary)
 for the Compose features this example requires.
 
 Helm lint and Go render tests cover positive/negative fixtures, network boundaries,
 existing Secret references, disabled workers and rejected public service options.
+They also exercise the committed release and TRMNL example values, ensuring the
+image digest, two station IDs, private access and Secret reference survive rendering.
 The chart is packaged locally and never installed by CI. The separate Dockerfile
 remains an optional Compose path with a digest-pinned Go builder and scratch
 runtime. See [packaging policy](releases.md) and [deployment](deployment.md).

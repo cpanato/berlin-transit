@@ -46,7 +46,7 @@ upstream. CLI queries open no listening socket; `serve` explicitly opens the
 loopback listener. CLI results stay on stdout unless the operator redirects
 them; service logs are structured JSON on stderr. Automated tests use local mock servers and need no VBB
 access. GitHub Actions test and build the collector and a local container image;
-they never publish images, create releases, or deploy anything. See
+ordinary CI never publishes images, creates releases, or deploys anything. See
 [CI and security checks](docs/ci.md) for tools, coverage and artifact retention.
 
 Departures accept `-mode` (`suburban`, `subway`, `tram`, `bus`, `ferry`, `express`,
@@ -174,3 +174,10 @@ Pushing an authorized `v*` tag starts the release workflow, including cosign
 signatures and GitHub build provenance, without an extra approval. Releases run
 only on tag pushes. See [signing and verification](docs/releases.md#signing-and-build-provenance)
 for publishing details and commands to verify downloaded artifacts.
+
+To use the published image without building, follow the
+[Compose release override](docs/deployment.md#use-the-published-image-instead-of-building)
+or [Helm release values](charts/berlin-transit/README.md#published-image).
+Both pin the verified image by digest and preserve private access. Optional
+TRMNL examples use Alexanderplatz and Friedrichstraße; the chart references an
+existing Kubernetes Secret. CI validates these examples without starting services.

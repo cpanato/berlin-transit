@@ -16,8 +16,14 @@ func TestCompose(t *testing.T) {
 	if os.Getenv("COMPOSE_CHECK") != "1" {
 		t.Skip("run make compose-check to validate the Compose example")
 	}
+	t.Run("local", func(t *testing.T) { testCompose(t, false) })
+	t.Run("release", func(t *testing.T) { testCompose(t, true) })
+}
+
+func testCompose(t *testing.T, release bool) {
+	t.Helper()
 	work := t.TempDir()
-	for _, file := range []struct{ source, target string }{{"compose.yaml", "compose.yaml"}, {".env.example", ".env"}} {
+	for _, file := range []struct{ source, target string }{{"compose.yaml", "compose.yaml"}, {"compose.release.yaml", "compose.release.yaml"}, {".env.example", ".env"}} {
 		data, err := os.ReadFile(filepath.Join("../..", file.source))
 		if err != nil {
 			t.Fatal(err)
@@ -41,7 +47,12 @@ func TestCompose(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "docker", "compose", "--project-directory", work, "--env-file", path, "-f", filepath.Join(work, "compose.yaml"), "config", "--format", "json")
+	args := []string{"compose", "--project-directory", work, "--env-file", path, "-f", filepath.Join(work, "compose.yaml")}
+	if release {
+		args = append(args, "-f", filepath.Join(work, "compose.release.yaml"))
+	}
+	args = append(args, "config", "--format", "json")
+	cmd := exec.CommandContext(ctx, "docker", args...)
 	cmd.Dir = work
 	for _, entry := range os.Environ() {
 		if !strings.HasPrefix(entry, "COMPOSE_") && !strings.HasPrefix(entry, "BERLIN_TRANSIT_COMPOSE_CANARY=") {
@@ -75,9 +86,21 @@ func TestCompose(t *testing.T) {
 	}
 	for key, want := range map[string]string{
 		"command": `["serve"]`, "user": `"65532:65532"`, "read_only": `true`, "cap_drop": `["ALL"]`,
-		"cpus": `1`, "pids_limit": `64`, "restart": `"unless-stopped"`, "pull_policy": `"never"`,
+		"cpus": `1`, "pids_limit": `64`, "restart": `"unless-stopped"`,
 	} {
 		equalJSON(t, lookup(t, service, key), want)
+	}
+	binary := "/berlin-transit"
+	if release {
+		binary = "/ko-app/berlin-transit"
+		equalJSON(t, lookup(t, service, "image"), strconv.Quote(releaseImage))
+		equalJSON(t, lookup(t, service, "pull_policy"), `"missing"`)
+		if lookup(t, service, "build") != nil {
+			t.Fatal("release override must remove the local build")
+		}
+	} else {
+		equalJSON(t, lookup(t, service, "pull_policy"), `"never"`)
+		equalJSON(t, lookup(t, service, "image"), `"berlin-transit:local"`)
 	}
 	opts, ok := lookup(t, service, "security_opt").([]any)
 	if !ok {
@@ -102,7 +125,7 @@ func TestCompose(t *testing.T) {
 		}
 	}
 	health := lookup(t, service, "healthcheck")
-	equalJSON(t, lookup(t, health, "test"), `["CMD","/berlin-transit","healthcheck"]`)
+	equalJSON(t, lookup(t, health, "test"), `["CMD",`+strconv.Quote(binary)+`,"healthcheck"]`)
 	equalJSON(t, lookup(t, health, "retries"), `3`)
 	for key, want := range map[string]time.Duration{"interval": 30 * time.Second, "timeout": 3 * time.Second, "start_period": 10 * time.Second} {
 		if duration(t, lookup(t, health, key)) != want {
@@ -122,6 +145,7 @@ func TestCompose(t *testing.T) {
 		"BERLIN_TRANSIT_LISTEN_ADDR": `"0.0.0.0:8080"`, "BERLIN_TRANSIT_ALLOW_CONTAINER_LISTEN": `"true"`,
 		"BERLIN_TRANSIT_METRICS_ENABLED": `"false"`, "BERLIN_TRANSIT_COLLECTOR_ENABLED": `"false"`,
 		"TRMNL_ENABLED": `"false"`, "TRMNL_WEBHOOK_URL": `""`,
+		"BERLIN_TRANSIT_COLLECTOR_STATIONS": `"900100003,900100001"`,
 	} {
 		equalJSON(t, lookup(t, env, key), want)
 	}
