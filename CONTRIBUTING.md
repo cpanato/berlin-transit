@@ -10,8 +10,9 @@ in behavior and avoid dependencies unless their rationale and official version
 source are documented.
 
 Keep domain data independent of VBB, HTTP and display integrations. Do not log
-searches, full request URLs or upstream bodies. Do not add public listeners,
-automatic publishing, releases or deployment. The workflows in
+searches, full request URLs or upstream bodies. Do not add public listeners or
+deployments. Keep publication in the documented version-tag release workflow.
+The workflows in
 https://github.com/cpanato/pr-inbox were reviewed before introducing CI. Keep
 action references pinned after checking their official sources. Tool selection
 lives in the workflows and module files; see [CI notes](docs/ci.md) for checks

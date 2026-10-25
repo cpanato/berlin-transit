@@ -3,10 +3,11 @@
 The packaging follows the local snapshot pattern reviewed in
 [cpanato/tado-bridge](https://github.com/cpanato/tado-bridge). Merging code builds
 and tests local snapshots without publishing. The separate
-[release workflow](../.github/workflows/release.yml) can publish an explicitly
-approved GitHub release and GHCR image, sign them and record build provenance.
-It is manual-only; a merge or tag push does not trigger publication. Deployment
-and Helm chart publication remain outside this workflow.
+[release workflow](../.github/workflows/release.yml) publishes a GitHub release
+and GHCR image, signs them and records build provenance when an operator pushes
+a `v*` version tag. This is the only release trigger. Merges and
+ordinary branch pushes do not publish. No environment approval is required.
+Deployment and Helm chart publication remain outside this workflow.
 
 ## Local tools
 
@@ -98,24 +99,17 @@ those external operations have succeeded.
 See the official [cosign integration](https://goreleaser.com/customization/sign/sign/#signing-with-cosign)
 and [GitHub build provenance documentation](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations).
 
-## Authorize a release
+## Publish a release
 
-A tag, release, image/chart publication or deployment requires a separate explicit
-instruction naming the intended action and target. This implementation creates
-none of them and does not configure the repository's release environment.
+Create and push a gitsign-signed SemVer tag for a merged commit with passing CI.
+Pushing a `v*` tag is the operator's publication instruction: the workflow runs
+without an additional approval. It validates the tag format, requires the tag to
+match the event's source commit and checks that the commit belongs to main.
+Only the publication job receives write/OIDC permissions after validation.
 
-Before a future release, configure a GitHub environment named `release` with
-required reviewers and allow the main branch. The preflight fails if reviewer
-protection is missing. Only the publication job receives write/OIDC permissions,
-after preflight and environment approval. CI/security checks must pass for the
-chosen commit before an operator creates and pushes the authorized SemVer tag.
-
-Dispatch `release.yml` from `main`, supplying that existing tag and explicitly
-checking `publish`. The tag must point to the workflow's exact main commit; the
-check runs before and after approval. This keeps the built source aligned with
-the commit recorded by GitHub provenance. If main advances, select the intended
-current commit and tag rather than releasing an older tag with unrelated source
-metadata. The workflow never creates or moves tags.
+The workflow builds the event's immutable SHA so provenance describes the source
+actually compiled. It never creates or moves tags and does not require a GitHub
+environment.
 
 The configured destinations are this repository's GitHub releases and
 `ghcr.io/cpanato/berlin-transit`. Signing/attestation records publish signer,
@@ -125,14 +119,17 @@ The chart still defaults to a local image and assumes no published release exist
 
 ## Verify downloaded artifacts
 
-Use the expected commit from your approved release, not a value supplied only by
-the downloaded artifact. The signing identity references `main` because release
-runs through manual dispatch from that branch:
+Use the expected commit and source ref for the release, not values supplied only
+by the downloaded artifact. Releases use the version tag as their source ref.
+The initial `v0.1.0` release predates this policy and used `refs/heads/main`:
 
 ```sh
 repo=cpanato/berlin-transit
 commit='<approved-commit-sha>'
-identity="https://github.com/$repo/.github/workflows/release.yml@refs/heads/main"
+release_tag='<release-tag>'
+source_ref="refs/tags/$release_tag"
+# For the initial v0.1.0 release, use: source_ref=refs/heads/main
+identity="https://github.com/$repo/.github/workflows/release.yml@$source_ref"
 issuer=https://token.actions.githubusercontent.com
 
 cosign verify-blob --bundle checksums.txt.sigstore.json \
@@ -143,7 +140,7 @@ sha256sum --check --ignore-missing checksums.txt
 
 gh attestation verify '<downloaded-archive>' --repo "$repo" \
   --signer-workflow "$repo/.github/workflows/release.yml" \
-  --source-ref refs/heads/main --source-digest "$commit"
+  --source-ref "$source_ref" --source-digest "$commit"
 
 image=ghcr.io/cpanato/berlin-transit
 digest='sha256:<published-manifest-digest>'
@@ -151,7 +148,7 @@ cosign verify --certificate-identity "$identity" \
   --certificate-oidc-issuer "$issuer" "$image@$digest"
 gh attestation verify "oci://$image@$digest" --repo "$repo" \
   --signer-workflow "$repo/.github/workflows/release.yml" \
-  --source-ref refs/heads/main --source-digest "$commit"
+  --source-ref "$source_ref" --source-digest "$commit"
 ```
 
 Extracted binaries can also be verified with their corresponding binary Sigstore

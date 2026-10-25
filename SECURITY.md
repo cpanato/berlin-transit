@@ -17,7 +17,7 @@ defaults to a literal loopback listener, with Host/Origin checks, strict query
 validation, bounded cache/concurrency, rate limits and HTTP timeouts. Metrics
 are disabled by default. There is no authentication; local access is trusted.
 Do not expose the service through a public proxy or port forwarding. There is
-no telemetry, deployment or automatic publishing. VBB needs no credentials. See
+no telemetry or deployment. VBB needs no credentials. See
 [API configuration](docs/api.md) for bounds and operational restrictions.
 
 Optional TRMNL publishing is disabled by default and requires explicit operator
@@ -55,9 +55,10 @@ path. Rebuilding a commit may resolve a different base. The separate Dockerfile
 builder retains its digest pin. Secret scanning and push protection use GitHub's
 native repository features; Go vulnerability/static analysis run in CI.
 
-The separate manual release workflow requires explicit publication confirmation,
-a tag matching its main commit and a protected release environment with reviewers.
-Only its approved release job receives publication/OIDC permissions. It signs
+The release workflow runs only for operator-pushed `v*` tags without an approval
+gate. It validates the tag
+against the event's source commit and main ancestry. Only its publication job
+receives publication/OIDC permissions. It signs
 binaries, checksums and image manifests with cosign and records GitHub build
 provenance. No key material is stored in the repository. Ordinary CI skips all
 signing and publishing. See [release verification](docs/releases.md#verify-downloaded-artifacts).

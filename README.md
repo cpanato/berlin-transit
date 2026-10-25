@@ -168,9 +168,9 @@ The optional Helm chart uses ClusterIP, restricted pods and a default egress
 policy; collection and TRMNL require explicit opt-in. CI renders and tests the
 chart without installing it. See [packaging and release policy](docs/releases.md)
 and the [Helm chart guide](charts/berlin-transit/README.md) for setup and limits.
-No image, chart or release is published automatically.
+Merges and ordinary branch pushes do not publish images or releases.
 
-The separate manual release workflow prepares cosign signatures and GitHub build
-provenance for an explicitly authorized release. See [signing, approval and
-verification](docs/releases.md#signing-and-build-provenance) for the release
-environment requirements and commands to verify downloaded artifacts.
+Pushing an authorized `v*` tag starts the release workflow, including cosign
+signatures and GitHub build provenance, without an extra approval. Releases run
+only on tag pushes. See [signing and verification](docs/releases.md#signing-and-build-provenance)
+for publishing details and commands to verify downloaded artifacts.
